@@ -2,6 +2,14 @@ import { getIronSession, IronSession, SessionOptions } from 'iron-session';
 import { cookies } from 'next/headers';
 import { SmartSession } from '@/types/smart';
 
+// ── 生產環境守衛：SESSION_SECRET 必須設定 ────────────────────────────────
+if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
+  throw new Error(
+    '[Patient Journey] SESSION_SECRET 未設定。' +
+    '請在環境變數中設定至少 32 字元的隨機字串，拒絕啟動以保護 token 安全。'
+  );
+}
+
 const sessionOptions: SessionOptions = {
   password: process.env.SESSION_SECRET ?? 'dev_only_secret_change_me_min_32_chars__',
   cookieName: 'pj_session',
@@ -10,15 +18,16 @@ const sessionOptions: SessionOptions = {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
+    // 最長 8 小時（配合典型臨床班次）
+    maxAge: 8 * 60 * 60,
   },
 };
 
-// 取得目前請求的伺服端 session（HttpOnly cookie 只放 session id/加密內容）
 export async function getSession(): Promise<IronSession<SmartSession>> {
   return getIronSession<SmartSession>(cookies(), sessionOptions);
 }
 
-// T2.4 — token 是否仍有效（保留 30s buffer）
+// T2.4 — token 是否仍有效（保留 60s buffer，比原本的 30s 更保守）
 export function isTokenValid(s: SmartSession): boolean {
-  return Boolean(s.accessToken && s.expiresAt && Date.now() < s.expiresAt - 30_000);
+  return Boolean(s.accessToken && s.expiresAt && Date.now() < s.expiresAt - 60_000);
 }
