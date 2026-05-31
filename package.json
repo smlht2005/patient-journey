@@ -1,13 +1,13 @@
 {
   "name": "patient-journey",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": false,
-  "description": "Patient Journey 病人就醫歷程智慧平台 — Next.js + BFF + SMART on FHIR (TW Core) POC",
+  "description": "Patient Journey 病人就醫歷程智慧平台 — Next.js + BFF + SMART on FHIR (TW Core)",
   "license": "MIT",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p ${PORT:-3000}",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"
   },
@@ -27,5 +27,8 @@
     "eslint": "8.57.0",
     "eslint-config-next": "14.2.5"
   },
-  "engines": { "node": ">=18.17" }
+  "engines": {
+    "node": ">=18.17",
+    "npm": ">=9"
+  }
 }
