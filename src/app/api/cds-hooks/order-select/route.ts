@@ -1,43 +1,41 @@
 /**
  * CDS Hooks — order-select
  * POST /api/cds-hooks/order-select
- * 
- * 觸發時機：醫師在 CPOE 介面選取 / 新增藥品草稿時
- * 執行：DDI 即時攔截 + critical 閾值 + AI 預判
- * 目標回應時間：< 500ms（規範要求）
+ * 修正：CORS origin 改由 ALLOWED_EHR_ORIGINS 環境變數控制。
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { CdsHookRequest } from '@/types/cds';
 import { processCdsRequest } from '@/lib/cds/cardBuilder';
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
+function getCorsHeaders(req: NextRequest): Record<string, string> {
+  const origin = req.headers.get('origin') ?? '';
+  const allowed = (process.env.ALLOWED_EHR_ORIGINS ?? '*').split(',').map(o => o.trim());
+  const isAllowed = allowed.includes('*') || allowed.includes(origin);
+  return {
+    'Access-Control-Allow-Origin':  isAllowed ? (allowed.includes('*') ? '*' : origin) : '',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Vary': 'Origin',
+  };
+}
 
 export async function POST(req: NextRequest) {
+  const corsHeaders = getCorsHeaders(req);
   try {
     const body: CdsHookRequest = await req.json();
-
     if (body.hook !== 'order-select') {
-      return NextResponse.json({ cards: [] }, { headers: CORS });
+      return NextResponse.json({ cards: [] }, { headers: corsHeaders });
     }
-
-    // 取 prefetch observations（EHR 提供）或空陣列
-    const prefetchObs: any[] = body.prefetch?.observations?.entry
+    const prefetchObs: any[] = (body.prefetch?.observations as any)?.entry
       ?.map((e: any) => e.resource) ?? [];
-
     const response = processCdsRequest(body, prefetchObs);
-    return NextResponse.json(response, { headers: CORS });
-
+    return NextResponse.json(response, { headers: corsHeaders });
   } catch (err) {
     console.error('[order-select]', err);
-    // CDS 規範：發生錯誤時回 200 + 空 cards，不應讓 EHR 流程中斷
-    return NextResponse.json({ cards: [] }, { status: 200, headers: CORS });
+    return NextResponse.json({ cards: [] }, { status: 200, headers: corsHeaders });
   }
 }
 
-export async function OPTIONS() {
-  return new Response(null, { status: 204, headers: CORS });
+export async function OPTIONS(req: NextRequest) {
+  return new Response(null, { status: 204, headers: getCorsHeaders(req) });
 }
