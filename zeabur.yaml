@@ -1,0 +1,41 @@
+# Zeabur 部署設定 — Patient Journey (Next.js)
+# 文件：https://zeabur.com/docs
+apiVersion: zeabur.com/v1
+metadata:
+  name: patient-journey
+spec:
+  template:
+    spec:
+      services:
+        - name: patient-journey
+          template: PREBUILT
+          spec:
+            source:
+              git:
+                repoID: smlht2005/patient-journey
+                branch: main
+            ports:
+              - id: web
+                port: 3000
+                type: HTTP
+            env:
+              # ── 必填：啟動前請於 Zeabur Dashboard 設定 ─────────────────
+              - key: SESSION_SECRET
+                description: "iron-session 加密密鑰（至少 32 字元隨機字串）"
+              - key: ANTHROPIC_API_KEY
+                description: "Anthropic Claude API Key"
+              - key: SMART_CLIENT_ID
+                description: "SMART on FHIR client_id"
+              - key: FHIR_ISS
+                description: "FHIR Server base URL"
+              - key: SMART_REDIRECT_URI
+                description: "https://<your-domain>/api/auth/callback"
+              - key: SMART_SCOPES
+                value: "launch openid fhirUser patient/*.read offline_access"
+              - key: ALLOWED_EHR_ORIGINS
+                description: "允許的 EHR CORS origin，逗號分隔；生產環境請收緊"
+              - key: NEXT_PUBLIC_BASE_URL
+                description: "https://<your-domain>"
+            resources:
+              cpu: 0.5
+              memory: 512Mi
