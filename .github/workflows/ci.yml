@@ -2,7 +2,7 @@ name: CI + Zeabur Deploy
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'claude/**']
   pull_request:
     branches: [main]
 
