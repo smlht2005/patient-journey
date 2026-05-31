@@ -23,19 +23,24 @@ spec:
               - key: SESSION_SECRET
                 description: "iron-session 加密密鑰（至少 32 字元隨機字串）"
               - key: ANTHROPIC_API_KEY
-                description: "Anthropic Claude API Key"
+                description: "Anthropic Claude API Key (sk-ant-...)"
               - key: SMART_CLIENT_ID
-                description: "SMART on FHIR client_id"
+                description: "SMART on FHIR client_id，例如 patient-journey-poc"
               - key: FHIR_ISS
                 description: "FHIR Server base URL"
+                value: "https://launch.smarthealthit.org/v/r4/fhir"
               - key: SMART_REDIRECT_URI
-                description: "https://<your-domain>/api/auth/callback"
+                description: "https://<your-zeabur-domain>/api/auth/callback"
               - key: SMART_SCOPES
                 value: "launch openid fhirUser patient/*.read offline_access"
               - key: ALLOWED_EHR_ORIGINS
                 description: "允許的 EHR CORS origin，逗號分隔；生產環境請收緊"
+                value: "*"
               - key: NEXT_PUBLIC_BASE_URL
-                description: "https://<your-domain>"
+                description: "https://<your-zeabur-domain>"
+              # ── Zeabur 自動注入（無需手動設定）─────────────────────────
+              - key: PORT
+                description: "Zeabur 自動注入，app 透過 npm run start 讀取"
             resources:
               cpu: 0.5
               memory: 512Mi
