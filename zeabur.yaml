@@ -16,7 +16,7 @@ spec:
                 branch: main
             ports:
               - id: web
-                port: 3000
+                port: 8080
                 type: HTTP
             env:
               # ── 必填：啟動前請於 Zeabur Dashboard 設定 ─────────────────
