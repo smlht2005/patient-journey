@@ -4,7 +4,7 @@
  * 預設：FHIR_BASE=http://localhost:9090  APP_BASE=http://localhost:3000
  */
 
-const FHIR_BASE = process.argv[2] ?? 'http://localhost:9090';
+const FHIR_BASE = process.argv[2] ?? 'http://localhost:9090/fhir';
 const APP_BASE  = process.argv[3] ?? 'http://localhost:3000';
 
 // ── 工具函式 ────────────────────────────────────────────────────────────────
