@@ -58,22 +58,35 @@ function observationStatus(loinc: string, value: number): 'normal' | 'warning' |
 
 // ── 主映射函式 ────────────────────────────────────────────────────────────────
 
+// extension URL 匹配：正規化後比對（忽略大小寫、連字號）
+function extVal(extensions: any[], keyword: string): string | undefined {
+  if (!Array.isArray(extensions)) return undefined;
+  const norm = (s: string) => s.toLowerCase().replace(/-/g, '');
+  const kw = norm(keyword);
+  return extensions.find((e: any) => norm(e.url ?? '').includes(kw))
+    ?.valueString ?? extensions.find((e: any) => norm(e.url ?? '').includes(kw))?.valueDate;
+}
+
 export function mapPatient(r: any): PatientVM {
   const name = r.name?.[0];
   const displayName = name?.text ?? [name?.family, ...(name?.given ?? [])].filter(Boolean).join(' ');
-  const allergy    = r.extension?.find((e: any) => e.url?.includes('allergy'))?.valueString ?? 'NKA';
-  const attending  = r.generalPractitioner?.[0]?.display ?? '—';
-  const bed        = r.extension?.find((e: any) => e.url?.includes('bed'))?.valueString
+  const ext        = r.extension ?? [];
+  const allergy    = extVal(ext, 'allergy') ?? 'NKA';
+  const attending  = r.generalPractitioner?.[0]?.display ?? extVal(ext, 'attending') ?? '—';
+  const bed        = extVal(ext, 'bed')
     ?? r.identifier?.find((i: any) => i.type?.coding?.[0]?.code === 'RN')?.value ?? '—';
-  const admit      = r.extension?.find((e: any) => e.url?.includes('admitDate'))?.valueDate
+  const admit      = extVal(ext, 'admitdate') ?? extVal(ext, 'admit')
     ?? r.meta?.lastUpdated?.slice(0, 10) ?? '—';
-  const code       = r.extension?.find((e: any) => e.url?.includes('codeStatus'))?.valueString ?? 'Full Code';
+  const code       = extVal(ext, 'codestatus') ?? extVal(ext, 'code') ?? 'Full Code';
+  // MRN：優先 type.coding MR，其次 system 含 mrn，最後 server id
+  const mrn = r.identifier?.find((i: any) => i.type?.coding?.[0]?.code === 'MR')?.value
+    ?? r.identifier?.find((i: any) => i.system?.toLowerCase().includes('mrn'))?.value
+    ?? r.id ?? '—';
   return {
     name: displayName || '(無姓名)',
     age: r.birthDate ? calcAge(r.birthDate) : 0,
     sex: r.gender === 'male' ? '男性' : r.gender === 'female' ? '女性' : '—',
-    mrn: r.identifier?.find((i: any) => i.type?.coding?.[0]?.code === 'MR')?.value ?? r.id ?? '—',
-    bed, attending, admit, code, allergy,
+    mrn, bed, attending, admit, code, allergy,
   };
 }
 
@@ -188,11 +201,25 @@ export function mapJourney(resources: any[]): JourneyEventVM[] {
 
 export function mapAlerts(observations: ObservationVM[], medications: MedicationVM[]): AlertVM[] {
   const alerts: AlertVM[] = [];
-  observations.forEach((o) => {
-    if (o.status === 'warning' || o.status === 'critical') {
-      alerts.push({ id: `alert-${o.code}-${o.time}`, level: o.status === 'critical' ? 'danger' : 'warning', title: `${o.display} 異常`, body: `數值 ${o.value} ${o.unit}，超出安全範圍，建議評估用藥控制情況。`, tag: `${o.display} > 閾值` });
-    }
+
+  // 每個 LOINC code 只保留最新一筆（避免多個時間點重複出現同一警示）
+  const latestByCode = new Map<string, ObservationVM>();
+  observations.forEach(o => {
+    if (o.status !== 'warning' && o.status !== 'critical') return;
+    const prev = latestByCode.get(o.code);
+    if (!prev || o.time > prev.time) latestByCode.set(o.code, o);
   });
+
+  latestByCode.forEach(o => {
+    alerts.push({
+      id: `alert-${o.code}`,
+      level: o.status === 'critical' ? 'danger' : 'warning',
+      title: `${o.display} 異常`,
+      body: `數值 ${o.value} ${o.unit}，超出安全範圍，建議評估用藥控制情況。`,
+      tag: `${o.display} > 閾值`,
+    });
+  });
+
   const names = medications.map((m) => m.name.toLowerCase());
   if (names.some(n => n.includes('warfarin') || n.includes('可邁丁')) && names.some(n => n.includes('aspirin') || n.includes('阿斯匹靈'))) {
     alerts.unshift({ id: 'ddi-warfarin-aspirin', level: 'danger', title: '嚴重藥物交互作用 (Warfarin + Aspirin)', body: '偵測到兩款藥物併用可能增加出血風險，建議立即評估並調整劑量。', tag: 'Drug-Drug' });
