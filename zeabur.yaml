@@ -22,8 +22,13 @@ spec:
               # ── 必填：啟動前請於 Zeabur Dashboard 設定 ─────────────────
               - key: SESSION_SECRET
                 description: "iron-session 加密密鑰（至少 32 字元隨機字串）"
+              - key: LLM_PROVIDER
+                description: "LLM 提供者：claude | deepseek（預設 deepseek）"
+                value: "deepseek"
               - key: ANTHROPIC_API_KEY
-                description: "Anthropic Claude API Key (sk-ant-...)"
+                description: "Anthropic Claude API Key (sk-ant-...)，LLM_PROVIDER=claude 時必填"
+              - key: DEEPSEEK_API_KEY
+                description: "DeepSeek API Key (sk-...)，LLM_PROVIDER=deepseek 時必填"
               - key: SMART_CLIENT_ID
                 description: "SMART on FHIR client_id，例如 patient-journey-poc"
               - key: FHIR_ISS
