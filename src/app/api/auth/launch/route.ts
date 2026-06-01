@@ -9,7 +9,15 @@ export async function GET(req: NextRequest) {
   const iss = url.searchParams.get('iss') ?? process.env.FHIR_ISS!;
   const launch = url.searchParams.get('launch') ?? undefined; // EHR launch 時帶入
 
-  const cfg = await discoverSmartConfig(iss);
+  let cfg;
+  try {
+    cfg = await discoverSmartConfig(iss);
+  } catch (err) {
+    return NextResponse.json(
+      { error: (err as Error).message },
+      { status: 400 },
+    );
+  }
   const { codeVerifier, codeChallenge, state } = createPkce();
 
   const session = await getSession();

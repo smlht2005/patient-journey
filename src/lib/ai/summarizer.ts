@@ -7,7 +7,7 @@
  *   brief   → 快速摘要（3 句以內）
  */
 
-import { callClaude, safeParseJson } from './claudeClient';
+import { callClaude, safeParseJson } from './llmClient';
 import { SummarizeRequest, SummarizeResponse } from '@/types/ai';
 
 const SYSTEM_PROMPT = `你是一位資深醫療 AI 助理，專門協助醫師快速掌握病人狀況。

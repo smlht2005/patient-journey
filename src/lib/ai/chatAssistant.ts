@@ -4,7 +4,7 @@
  * 修正：過濾 system role 訊息而非轉為 user role，
  * 避免 AI 誤讀對話角色（system 內容已由 system param 處理）。
  */
-import { callClaude } from './claudeClient';
+import { callClaude } from './llmClient';
 import { ChatRequest, ChatResponse } from '@/types/ai';
 
 const BASE_SYSTEM = `你是 Patient Journey 系統的 AI 臨床助理，

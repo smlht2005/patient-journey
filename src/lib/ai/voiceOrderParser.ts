@@ -7,7 +7,7 @@
  * 支援中文、英文、混合語言醫囑輸入。
  */
 
-import { callClaude, safeParseJson } from './claudeClient';
+import { callClaude, safeParseJson } from './llmClient';
 import {
   VoiceOrderRequest, VoiceOrderResponse,
   ParsedMedIntent, FhirMedicationRequest,
@@ -130,7 +130,7 @@ export async function parseVoiceOrder(
       return {
         success: false,
         confidence: 0,
-        error: `無法解析醫囑，請重新描述。Claude 回應：${rawText.slice(0, 200)}`,
+        error: `無法解析醫囑，請重新描述。AI 回應：${rawText.slice(0, 200)}`,
       };
     }
 

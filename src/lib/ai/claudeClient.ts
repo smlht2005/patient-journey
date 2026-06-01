@@ -17,7 +17,7 @@ export interface ClaudeCallOptions {
   temperature?: number;
 }
 
-export async function callClaude(opts: ClaudeCallOptions): Promise<string> {
+export async function callClaudeProvider(opts: ClaudeCallOptions): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY 未設定，請確認 .env.local');
 
