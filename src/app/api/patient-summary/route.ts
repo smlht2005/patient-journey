@@ -9,6 +9,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fhirFetch } from '@/lib/fhir/client';
 import { getSession } from '@/lib/session/store';
+
+export const dynamic = 'force-dynamic';
 import { buildPatientSummary } from '@/lib/fhir/mappers';
 import { MOCK_SUMMARY } from '@/lib/fhir/mock';
 

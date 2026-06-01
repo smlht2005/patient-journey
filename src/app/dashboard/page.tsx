@@ -5,6 +5,8 @@
  * 改為直接從 FHIR 取資源並呼叫 buildPatientSummary()，
  * 消除 Vercel Serverless cold start 疊加延遲。
  */
+export const dynamic = 'force-dynamic';
+
 import { getSession, isTokenValid } from '@/lib/session/store';
 import { fhirFetch } from '@/lib/fhir/client';
 import { buildPatientSummary } from '@/lib/fhir/mappers';
