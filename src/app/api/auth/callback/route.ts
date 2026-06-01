@@ -44,5 +44,9 @@ export async function GET(req: NextRequest) {
   session.state = undefined;
   await session.save();
 
-  return NextResponse.redirect(new URL('/dashboard', req.url));
+  // 使用 NEXT_PUBLIC_BASE_URL 避免反向代理（Zeabur）將 req.url 解析為內部 localhost
+  const baseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL ??
+    `${req.headers.get('x-forwarded-proto') ?? 'https'}://${req.headers.get('x-forwarded-host') ?? req.headers.get('host')}`;
+  return NextResponse.redirect(new URL('/dashboard', baseUrl));
 }
