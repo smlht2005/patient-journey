@@ -45,10 +45,26 @@ async function ensureValidToken(): Promise<void> {
   await refreshPromise;
 }
 
+const DEV_NO_AUTH = 'dev-no-auth';
+
 export async function fhirFetch(path: string, init?: RequestInit): Promise<Response> {
+  const session = await getSession();
+
+  if (session.accessToken === DEV_NO_AUTH) {
+    // dev 模式：直接連本機 FHIR（無 OAuth），不附 Authorization header
+    if (!session.iss) throw new Error('dev-login 未設定 iss，請重新執行 dev-login');
+    const base = session.iss.replace(/\/+$/, '');
+    const url = path.startsWith('http') ? path : `${base}/${path.replace(/^\/+/, '')}`;
+    return fetch(url, {
+      ...init,
+      headers: { ...(init?.headers ?? {}), Accept: 'application/fhir+json' },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(15_000),
+    });
+  }
+
   await ensureValidToken();
 
-  const session = await getSession();
   if (!session.accessToken || !session.iss) {
     throw new Error('未授權：缺少 access_token，請先完成 SMART launch');
   }
@@ -64,6 +80,6 @@ export async function fhirFetch(path: string, init?: RequestInit): Promise<Respo
       Accept: 'application/fhir+json',
     },
     cache: 'no-store',
-    signal: AbortSignal.timeout(15_000), // 15s timeout
+    signal: AbortSignal.timeout(15_000),
   });
 }
