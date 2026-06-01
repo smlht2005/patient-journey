@@ -1,11 +1,20 @@
 import { SmartConfiguration } from '@/types/smart';
 
 const ALLOWED_SCHEMES = ['https:', 'http:'];
-const MAX_REDIRECTS_SAFE = true; // fetch follows redirects by default
+
+/** 輸入驗證失敗（客戶端提供了非法 ISS）→ 呼叫端應回 400 */
+export class SmartValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SmartValidationError';
+  }
+}
 
 /**
  * T2.1 — 依 iss 探索 .well-known/smart-configuration
  * 安全加固：驗證 iss scheme，防 SSRF；生產環境強制 HTTPS。
+ * 拋出 SmartValidationError → 呼叫端回 400
+ * 拋出 Error              → 呼叫端回 503/504（暫時性故障）
  */
 export async function discoverSmartConfig(iss: string): Promise<SmartConfiguration> {
   // ── SSRF 防護：驗證 iss 格式與 scheme ─────────────────────────────────
@@ -13,16 +22,16 @@ export async function discoverSmartConfig(iss: string): Promise<SmartConfigurati
   try {
     parsed = new URL(iss);
   } catch {
-    throw new Error(`無效的 FHIR ISS URL：${iss}`);
+    throw new SmartValidationError(`無效的 FHIR ISS URL：${iss}`);
   }
 
   if (!ALLOWED_SCHEMES.includes(parsed.protocol)) {
-    throw new Error(`不允許的 ISS protocol：${parsed.protocol}（僅允許 http/https）`);
+    throw new SmartValidationError(`不允許的 ISS protocol：${parsed.protocol}（僅允許 http/https）`);
   }
 
   // 生產環境強制 HTTPS
   if (process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') {
-    throw new Error('生產環境 FHIR ISS 必須使用 HTTPS');
+    throw new SmartValidationError('生產環境 FHIR ISS 必須使用 HTTPS');
   }
 
   // 阻擋 localhost / 內網 IP（防止 SSRF 打內部服務）
@@ -36,7 +45,7 @@ export async function discoverSmartConfig(iss: string): Promise<SmartConfigurati
     host === '0.0.0.0';
 
   if (process.env.NODE_ENV === 'production' && isInternal) {
-    throw new Error(`生產環境不允許連接內網 ISS：${host}`);
+    throw new SmartValidationError('FHIR ISS 不可為內網位址');
   }
   // ─────────────────────────────────────────────────────────────────────
 

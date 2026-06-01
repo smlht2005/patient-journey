@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { discoverSmartConfig } from '@/lib/smart/discovery';
+import { discoverSmartConfig, SmartValidationError } from '@/lib/smart/discovery';
 import { createPkce } from '@/lib/smart/pkce';
 import { getSession } from '@/lib/session/store';
 
@@ -13,11 +13,18 @@ export async function GET(req: NextRequest) {
   try {
     cfg = await discoverSmartConfig(iss);
   } catch (err) {
+    if (err instanceof SmartValidationError) {
+      return NextResponse.json({ error: (err as Error).message }, { status: 400 });
+    }
+    // 網路逾時、DNS 失敗、上游 5xx — 不洩漏內部細節
+    console.error('[launch] SMART discovery 失敗:', err);
+    const isTimeout = err instanceof Error && err.name === 'AbortError';
     return NextResponse.json(
-      { error: (err as Error).message },
-      { status: 400 },
+      { error: 'SMART 服務暫時無法連線，請稍後再試' },
+      { status: isTimeout ? 504 : 503 },
     );
   }
+
   const { codeVerifier, codeChallenge, state } = createPkce();
 
   const session = await getSession();

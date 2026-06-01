@@ -1,29 +1,18 @@
-/**
- * Anthropic Claude API 客戶端
- *
- * 修正：加入 15s AbortSignal.timeout() 防止 Claude API 吊住整個請求。
- */
+import { LLMMessage, LLMCallOptions, DEFAULT_MAX_TOKENS, DEFAULT_TIMEOUT_MS } from './llmTypes';
+
 const CLAUDE_API = 'https://api.anthropic.com/v1/messages';
 const MODEL      = 'claude-sonnet-4-20250514';
-const MAX_TOKENS = 1500;
-const TIMEOUT_MS = 15_000; // 15 秒
 
-export interface ClaudeMessage { role: 'user' | 'assistant'; content: string }
+export type ClaudeMessage     = LLMMessage;
+export type ClaudeCallOptions = LLMCallOptions;
 
-export interface ClaudeCallOptions {
-  system?: string;
-  messages: ClaudeMessage[];
-  maxTokens?: number;
-  temperature?: number;
-}
-
-export async function callClaudeProvider(opts: ClaudeCallOptions): Promise<string> {
+export async function callClaudeProvider(opts: LLMCallOptions): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY 未設定，請確認 .env.local');
 
   const body: Record<string, unknown> = {
     model: MODEL,
-    max_tokens: opts.maxTokens ?? MAX_TOKENS,
+    max_tokens: opts.maxTokens ?? DEFAULT_MAX_TOKENS,
     messages: opts.messages,
   };
   if (opts.system)               body.system      = opts.system;
@@ -38,7 +27,7 @@ export async function callClaudeProvider(opts: ClaudeCallOptions): Promise<strin
     },
     body: JSON.stringify(body),
     cache: 'no-store',
-    signal: AbortSignal.timeout(TIMEOUT_MS), // ← 修正：防止無限等待
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
   });
 
   if (!res.ok) {
@@ -46,7 +35,7 @@ export async function callClaudeProvider(opts: ClaudeCallOptions): Promise<strin
     throw new Error(`Claude API 錯誤 ${res.status}: ${errBody.slice(0, 300)}`);
   }
 
-  const data = await res.json();
+  const data = await res.json().catch(() => { throw new Error('Claude API 回傳非法 JSON'); });
   return data.content?.[0]?.text ?? '';
 }
 

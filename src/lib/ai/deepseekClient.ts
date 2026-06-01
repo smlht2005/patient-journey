@@ -1,11 +1,9 @@
-import { ClaudeCallOptions } from './claudeClient';
+import { LLMCallOptions, DEFAULT_MAX_TOKENS, DEFAULT_TIMEOUT_MS } from './llmTypes';
 
 const DEEPSEEK_API = 'https://api.deepseek.com/v1/chat/completions';
 const MODEL        = 'deepseek-chat';
-const MAX_TOKENS   = 1500;
-const TIMEOUT_MS   = 15_000;
 
-export async function callDeepSeekProvider(opts: ClaudeCallOptions): Promise<string> {
+export async function callDeepSeekProvider(opts: LLMCallOptions): Promise<string> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error('DEEPSEEK_API_KEY 未設定，請確認 .env.local');
 
@@ -15,7 +13,7 @@ export async function callDeepSeekProvider(opts: ClaudeCallOptions): Promise<str
 
   const body: Record<string, unknown> = {
     model: MODEL,
-    max_tokens: opts.maxTokens ?? MAX_TOKENS,
+    max_tokens: opts.maxTokens ?? DEFAULT_MAX_TOKENS,
     messages,
   };
   if (opts.temperature !== undefined) body.temperature = opts.temperature;
@@ -28,7 +26,7 @@ export async function callDeepSeekProvider(opts: ClaudeCallOptions): Promise<str
     },
     body: JSON.stringify(body),
     cache: 'no-store',
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
   });
 
   if (!res.ok) {
@@ -36,6 +34,11 @@ export async function callDeepSeekProvider(opts: ClaudeCallOptions): Promise<str
     throw new Error(`DeepSeek API 錯誤 ${res.status}: ${errBody.slice(0, 300)}`);
   }
 
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content ?? '';
+  const data = await res.json().catch(() => { throw new Error('DeepSeek API 回傳非法 JSON'); });
+
+  const content = data.choices?.[0]?.message?.content;
+  if (content == null || data.choices?.length === 0) {
+    throw new Error(`DeepSeek API 無有效回應（choices 為空或 content 為 null）`);
+  }
+  return content as string;
 }
