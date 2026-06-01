@@ -35,11 +35,16 @@ export async function GET(req: NextRequest) {
   session.state = state;
   await session.save();
 
+  // Standalone Launch 不傳 launch context → 移除 'launch' scope
+  // EHR Launch 才需要 'launch' scope（帶 opaque context token）
+  const rawScopes = process.env.SMART_SCOPES!;
+  const scopes = launch ? rawScopes : rawScopes.replace(/\blaunch\b\s*/g, '').trim();
+
   const authUrl = new URL(cfg.authorization_endpoint);
   authUrl.searchParams.set('response_type', 'code');
   authUrl.searchParams.set('client_id', process.env.SMART_CLIENT_ID!);
   authUrl.searchParams.set('redirect_uri', process.env.SMART_REDIRECT_URI!);
-  authUrl.searchParams.set('scope', process.env.SMART_SCOPES!);
+  authUrl.searchParams.set('scope', scopes);
   authUrl.searchParams.set('state', state);
   authUrl.searchParams.set('aud', iss);
   authUrl.searchParams.set('code_challenge', codeChallenge);

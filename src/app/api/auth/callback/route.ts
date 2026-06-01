@@ -5,6 +5,18 @@ import { getSession } from '@/lib/session/store';
 // T2.3 — Authorization callback：驗 state、換 token、存 session
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
+  const oauthError = url.searchParams.get('error');
+  const oauthErrorDesc = url.searchParams.get('error_description');
+
+  // OAuth 2.0 error response（授權伺服器拒絕）— 先於 CSRF 檢查
+  if (oauthError) {
+    const detail = oauthErrorDesc ? decodeURIComponent(oauthErrorDesc) : oauthError;
+    return NextResponse.json(
+      { error: `授權失敗：${detail}` },
+      { status: 400 },
+    );
+  }
+
   const code = url.searchParams.get('code');
   const state = url.searchParams.get('state');
   const session = await getSession();
