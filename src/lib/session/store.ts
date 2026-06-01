@@ -2,14 +2,6 @@ import { getIronSession, IronSession, SessionOptions } from 'iron-session';
 import { cookies } from 'next/headers';
 import { SmartSession } from '@/types/smart';
 
-// ── 生產環境守衛：SESSION_SECRET 必須設定 ────────────────────────────────
-if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
-  throw new Error(
-    '[Patient Journey] SESSION_SECRET 未設定。' +
-    '請在環境變數中設定至少 32 字元的隨機字串，拒絕啟動以保護 token 安全。'
-  );
-}
-
 const sessionOptions: SessionOptions = {
   password: process.env.SESSION_SECRET ?? 'dev_only_secret_change_me_min_32_chars__',
   cookieName: 'pj_session',
@@ -24,6 +16,13 @@ const sessionOptions: SessionOptions = {
 };
 
 export async function getSession(): Promise<IronSession<SmartSession>> {
+  // 守衛在 request time 執行，避免 build time throw 導致 Next.js 收集頁面資料失敗
+  if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
+    throw new Error(
+      '[Patient Journey] SESSION_SECRET 未設定。' +
+      '請在環境變數中設定至少 32 字元的隨機字串。',
+    );
+  }
   return getIronSession<SmartSession>(cookies(), sessionOptions);
 }
 
