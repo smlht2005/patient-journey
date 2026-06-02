@@ -71,32 +71,72 @@ docker run -p 9090:8080 hapiproject/hapi:latest
 
 #### Step 1：Seed 測試資料
 
+每次執行產生**不同病人**（姓名含時間戳或自訂），Lab 數值隨機化，MRN 唯一，與 Mock 資料明確區分。
+
 ```bash
-npm run seed:fhir
-# 將 MOCK_SUMMARY 轉為 134 個 FHIR R4 resources 並 POST 至 localhost:9090/fhir
-# 輸出：Patient ID 與 dev-login URL
+npm run seed:fhir                      # 預設名稱：測試_MMDD_HHmm
+npm run seed:fhir -- --name=王大華     # 自訂病人姓名
+npm run seed:fhir -- --name=李小美 --fhir=http://localhost:9090/fhir
 ```
 
-seed 後 FHIR Docker 資料：
+每次 seed 輸出：
+
+```
+🌐 FHIR target : http://localhost:9090/fhir
+👤 病人姓名    : 王大華
+🪪  MRN        : T202606021239         ← 時間戳唯一 MRN
+🧪 Lab 數值    : HbA1c 7.6% | LDL 137 | Glucose 199 | SBP 138  ← 每次隨機
+📦 Bundle 數量 : 134 entries
+
+✅ Seed 完成！
+👤 Patient ID : 2187
+🚀 Dev Login URL：
+   http://localhost:3000/api/auth/dev-login?fhirBase=...&patientId=2187
+```
+
+每次 seed 寫入的 FHIR resources（134 個）：
 
 | Resource | 數量 | 說明 |
 |----------|------|------|
-| Patient | 1 | 陳大明，MRN: A123456789 |
-| Observation | 121 | 7 筆 Lab（LOINC）+ 114 筆 Vital Signs（19 時間點 × 6 項） |
+| Patient | 1 | 自訂姓名，MRN = `T + yyyyMMddHHmm` |
+| Observation | 121 | 7 筆 Lab（LOINC，數值隨機化）+ 114 筆 Vital Signs（19 時間點 × 6 項） |
 | MedicationRequest | 5 | Metformin / Januvia / Insulin / Lisinopril / Atorvastatin |
-| MedicationAdministration | 3 | 給藥紀錄 |
-| DiagnosticReport | 4 | 檢驗 × 3 + 影像 × 1 |
+| MedicationAdministration | 3 | 最近 3 天給藥紀錄 |
+| DiagnosticReport | 4 | 檢驗 × 3 + 影像 × 1（Chest X-Ray） |
 
 #### Step 2：Dev Login
 
 ```bash
-# 將 seed 輸出的 URL 貼入瀏覽器（patientId 由 seed 分配）
+# 將 seed 輸出的 URL 貼入瀏覽器（patientId 由 HAPI FHIR 伺服器分配）
 http://localhost:3000/api/auth/dev-login?fhirBase=http%3A%2F%2Flocalhost%3A9090%2Ffhir&patientId=<id>
 ```
 
 > **安全說明**：`/api/auth/dev-login` 在 `NODE_ENV=production` 回傳 404，生產環境完全不暴露。
 
-Dashboard 顯示**綠色** Banner `✅ 資料來源：HAPI FHIR`。
+Dashboard 顯示**綠色** Banner：
+```
+✅ 資料來源：HAPI FHIR (TW Core) — http://localhost:9090/fhir — 即時同步
+```
+
+#### Step 3：切換病人（Dashboard 內）
+
+Dev 模式登入後，病人資訊 Card 底部出現「切換病人 (Dev)」區塊：
+
+```
+[ Patient ID 輸入框 ] [ 查詢 ]
+```
+
+輸入另一個 Patient ID（例如多次 seed 後的不同 ID）→ 按「查詢」或 Enter，  
+即可無縫切換至同一 FHIR Docker 的其他病人，不需重新 seed。
+
+#### 病人資訊欄位 Icon
+
+| 欄位 | Icon | 說明 |
+|------|------|------|
+| 病歷號 | `#` Hash | 唯一識別碼（MRN） |
+| 病房/床號 | 🛏 BedDouble | 病房與床位 |
+| 主治醫師 | 🩺 Stethoscope | 負責醫師 |
+| 入院日期 | 📅 CalendarDays | 住院起始日 |
 
 ---
 
