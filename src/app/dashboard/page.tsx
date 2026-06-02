@@ -21,8 +21,26 @@ async function toResources(res: Response): Promise<any[]> {
 
 export default async function Dashboard() {
   const session = await getSession();
-  const patientId = session.patientId ?? '';
-  const authed = isTokenValid(session) && patientId.length > 0;
+  let patientId = session.patientId ?? '';
+  const tokenValid = isTokenValid(session);
+
+  // Standalone Launch 不回傳 patient claim → 自動從 FHIR 取第一筆 Patient
+  if (tokenValid && !patientId) {
+    try {
+      const listRes = await fhirFetch('Patient?_count=1&_sort=-_lastUpdated');
+      if (listRes.ok) {
+        const bundle = await listRes.json();
+        const firstId = bundle.entry?.[0]?.resource?.id as string | undefined;
+        if (firstId) {
+          patientId = firstId;
+          session.patientId = firstId;
+          await session.save();
+        }
+      }
+    } catch { /* silently fall through to mock */ }
+  }
+
+  const authed = tokenValid && patientId.length > 0;
 
   let summary = MOCK_SUMMARY;
   let source  = 'mock';
