@@ -147,13 +147,16 @@ Dev 模式登入後，病人資訊 Card 底部出現「切換病人 (Dev)」區�
 #### .env.local 設定
 
 ```env
-FHIR_ISS=https://launch.smarthealthit.org/v/r4/sim/WzIsIkRhbmllbCBBZGFtcyIsIiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0/fhir
+# 必須使用含病人 ID 的 sim context URL（見下方說明）
+FHIR_ISS=https://launch.smarthealthit.org/v/r4/sim/WzIsIkRhbmllbCBBZGFtcyIsIjk5MTcwZWM3LTNkZTQtNDE5Zi04YzM1LWQ5NWFjM2I0ZmU2YiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0=/fhir
 SMART_CLIENT_ID=patient-journey-poc
 SMART_REDIRECT_URI=http://localhost:3000/api/auth/callback
 SMART_SCOPES=launch openid fhirUser patient/*.read offline_access
 ```
 
-> `FHIR_ISS` 必須使用**含 sim context 的 URL**（如上）。裸 URL `https://launch.smarthealthit.org/v/r4/fhir` 無病人資料，會出現 SyntaxError。
+> **`FHIR_ISS` 注意事項：**
+> - 裸 URL（`/v/r4/fhir`）無病人資料，會出現 SyntaxError
+> - SMART Standalone Launch **不回傳 `patient` claim**；callback route 會自動查詢 `Patient?_count=1` 補齊
 
 #### 授權流程
 
@@ -162,7 +165,8 @@ SMART_SCOPES=launch openid fhirUser patient/*.read offline_access
 2. 點擊「以 SMART on FHIR 啟動 (Standalone Launch)」
 3. SMART Health IT 登入頁 → 選擇醫師（任意密碼）
 4. Authorize App Launch → 點擊「Approve」
-5. 自動 redirect → /dashboard（綠色 Banner）
+5. Callback 自動查詢 FHIR 取得 Patient ID
+6. 自動 redirect → /dashboard（綠色 Banner）
 ```
 
 #### OAuth 流程圖
@@ -185,9 +189,23 @@ SMART_SCOPES=launch openid fhirUser patient/*.read offline_access
   │  POST /token      │──────────────────────── ▶│
   │  code+verifier    │  access_token            │
   │                   │◀─────────────────────────│
-  │  存 session       │                          │
-  │  redirect /dashboard                         │
+  │  若無 patient →   │ GET /fhir/Patient?_count=1│
+  │  自動查詢並存入   │──────────────────────── ▶│
+  │  session          │◀─────────────────────────│
+  │  redirect /dashboard (NEXT_PUBLIC_BASE_URL)  │
 ```
+
+#### Standalone Launch 的 patient context 說明
+
+SMART Standalone Launch **不保證** token response 含有 `patient` claim（與 EHR Launch 不同）。
+本專案在 `callback/route.ts` 實作自動補齊：
+
+```
+token.patient 有值 → 直接使用
+token.patient 空   → GET /fhir/Patient?_count=1 → 取第一筆 Patient ID
+```
+
+詳細說明：`docs/troubleshooting-smart-standalone-launch.md`
 
 ---
 
@@ -223,8 +241,12 @@ git push origin main   # Zeabur 自動監聽 main branch
 
 **Zeabur 環境特性**：
 - 內部 port：8080（`PORT=${WEB_PORT}` 自動注入）
-- 反向代理：`req.url` 為內部 localhost:8080，`NEXT_PUBLIC_BASE_URL` 用於 redirect
+- 反向代理：`req.url` 為內部 `localhost:8080`，所有 redirect 必須用 `NEXT_PUBLIC_BASE_URL`
 - CI：`.github/workflows/ci.yml`（typecheck + build → Zeabur 自動部署）
+
+> **`variable env` 警告**：`npx zeabur variable env -f <file>` 為**覆蓋**語意，
+> 會刪除檔案外的所有 key。更新單一變數時，請確保 `.env` 檔包含**所有**必要變數。
+> 詳見 `docs/troubleshooting-smart-standalone-launch.md`。
 
 ---
 
@@ -306,16 +328,29 @@ docs/
 
 ---
 
+## 疑難排解文件
+
+| 文件 | 涵蓋內容 |
+|------|---------|
+| `docs/troubleshooting-smart-auth.md` | SMART OAuth 基本授權流程問題 |
+| `docs/troubleshooting-zeabur-deploy.md` | Zeabur build 失敗（SESSION_SECRET、force-dynamic、package-lock） |
+| `docs/troubleshooting-smart-standalone-launch.md` | Standalone Launch 無 patient claim、localhost:8080 redirect、variable env 覆蓋 |
+
+---
+
 ## 路線圖
 
 - [x] BFF + SMART on FHIR OAuth2（PKCE、state、token 自動續期）
 - [x] FHIR TW Core 資料映射（`mappers.ts` → ViewModel）
 - [x] AI 服務（Chat / 智慧摘要 / 語音開立 FHIR MedicationRequest）
 - [x] CDS Hooks（DDI 6 條規則 + 8 個 LOINC 閾值警示）
-- [x] Zeabur 雲端部署 + CI/CD
+- [x] Zeabur 雲端部署 + CI/CD（`https://patient-journey.zeabur.app`）
 - [x] 本機 FHIR Docker 整合（seed + dev-login）
+- [x] Standalone Launch patient auto-discover
+- [x] 行動裝置響應式佈局（< 900px 單欄）
 - [ ] 真實 HIS/EHR 串接（EHR Launch）
 - [ ] TW Core Profile 完整驗證（LOINC + 台灣健保代碼對照）
+- [ ] 移除 `/api/debug/session` 診斷端點（驗證完成後）
 
 ---
 
