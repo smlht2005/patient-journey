@@ -141,8 +141,9 @@ export default function PatientJourneyDashboard({ summary, iss = '', isDev = fal
 
       {flash && <div style={{ position: 'fixed', top: 64, left: '50%', transform: 'translateX(-50%)', zIndex: 60, background: C.red, color: '#fff', padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600 }}><ShieldAlert size={14} style={{ display: 'inline', marginRight: 6 }} />{flash}</div>}
 
-      {/* Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px,280px) minmax(0,1fr) minmax(280px,340px)', gap: 12, padding: 12, alignItems: 'start' }}>
+      {/* Grid — 桌面三欄，手機單欄 */}
+      <style>{`@media(min-width:900px){.pj-grid{grid-template-columns:minmax(240px,280px) minmax(0,1fr) minmax(280px,340px)!important}}`}</style>
+      <div className="pj-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, padding: 12, alignItems: 'start' }}>
 
         {/* LEFT */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -318,7 +319,7 @@ export default function PatientJourneyDashboard({ summary, iss = '', isDev = fal
         {/* RIGHT */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <Card title="病人綜合指標 (Health Radar)" icon={<Stethoscope size={15} color={C.cyan} />}>
-            <div style={{ height: 210 }}>
+            <div style={{ height: 210, minWidth: 240 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <RadarChart data={radar} outerRadius="72%">
                   <PolarGrid stroke={C.border} />
