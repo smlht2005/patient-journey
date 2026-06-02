@@ -4,7 +4,7 @@
  * 接收 PatientSummaryVM props，不再使用內部 hardcoded mock。
  * 原 PatientJourney.jsx 保留作為靜態 POC 展示。
  */
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   RadarChart, Radar, PolarGrid, PolarAngleAxis,
@@ -14,8 +14,15 @@ import {
   Activity, AlertTriangle, Pill, FileText, Image as ImageIcon, Search,
   User, Mic, Send, X, CheckCircle2, Clock, ShieldAlert, Brain,
   Stethoscope, ChevronRight, Sparkles, Radio,
+  Hash, BedDouble, CalendarDays, ArrowRightLeft,
 } from 'lucide-react';
 import { PatientSummaryVM, AlertVM } from '@/types/viewmodels';
+
+interface DashboardProps {
+  summary: PatientSummaryVM;
+  iss?: string;
+  isDev?: boolean;
+}
 
 const C = {
   bg0: '#050b18', bg1: '#0a1424', bg2: '#0e1c33', bg3: '#13294b',
@@ -55,7 +62,7 @@ function Card({ title, icon, right, children, style }: any) {
   );
 }
 
-export default function PatientJourneyDashboard({ summary }: { summary: PatientSummaryVM }) {
+export default function PatientJourneyDashboard({ summary, iss = '', isDev = false }: DashboardProps) {
   const { patient, vitals, medications, journey, adherence, radar, alerts: seedAlerts } = summary;
   const [selectedDrug, setSelectedDrug] = useState(medications[0]?.id ?? '');
   const [alerts, setAlerts] = useState<AlertVM[]>(seedAlerts);
@@ -66,6 +73,7 @@ export default function PatientJourneyDashboard({ summary }: { summary: PatientS
   const [signed, setSigned] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [aiInput, setAiInput] = useState('');
+  const [switchId, setSwitchId] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -147,14 +155,44 @@ export default function PatientJourneyDashboard({ summary }: { summary: PatientS
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 10px', fontSize: 11.5 }}>
-              {([['病歷號', patient.mrn], ['病房/床號', patient.bed], ['主治醫師', patient.attending], ['入院日期', patient.admit]] as [string,string][]).map(([k, v]) => (
-                <div key={k}><div style={{ color: C.t3 }}>{k}</div><div style={{ color: C.t1, fontFamily: 'monospace', fontSize: 12 }}>{v}</div></div>
+              {([
+                [<Hash size={11} color={C.t3} />,        '病歷號',   patient.mrn],
+                [<BedDouble size={11} color={C.t3} />,   '病房/床號', patient.bed],
+                [<Stethoscope size={11} color={C.t3} />, '主治醫師', patient.attending],
+                [<CalendarDays size={11} color={C.t3} />,'入院日期', patient.admit],
+              ] as [React.ReactNode, string, string][]).map(([icon, k, v]) => (
+                <div key={k}>
+                  <div style={{ color: C.t3, display: 'flex', alignItems: 'center', gap: 3 }}>{icon}{k}</div>
+                  <div style={{ color: C.t1, fontFamily: 'monospace', fontSize: 12 }}>{v}</div>
+                </div>
               ))}
             </div>
             <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'rgba(34,197,94,.12)', color: C.green, border: `1px solid ${C.green}44` }}>{patient.code}</span>
               <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'rgba(244,63,94,.12)', color: C.red, border: `1px solid ${C.red}44`, display: 'flex', alignItems: 'center', gap: 4 }}><AlertTriangle size={11} />{patient.allergy}</span>
             </div>
+            {isDev && iss && (
+              <div style={{ marginTop: 10, borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
+                <div style={{ fontSize: 10, color: C.t3, display: 'flex', alignItems: 'center', gap: 4, marginBottom: 5 }}>
+                  <ArrowRightLeft size={10} color={C.t3} />切換病人 (Dev)
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    placeholder="Patient ID"
+                    value={switchId}
+                    onChange={e => setSwitchId(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && switchId.trim()) window.location.href = `/api/auth/dev-login?fhirBase=${encodeURIComponent(iss)}&patientId=${switchId.trim()}`; }}
+                    style={{ flex: 1, background: C.bg3, border: `1px solid ${C.border}`, borderRadius: 6, padding: '4px 8px', color: C.t1, fontSize: 11, outline: 'none' }}
+                  />
+                  <button
+                    onClick={() => { if (switchId.trim()) window.location.href = `/api/auth/dev-login?fhirBase=${encodeURIComponent(iss)}&patientId=${switchId.trim()}`; }}
+                    style={{ background: C.cyanDim, border: `1px solid ${C.cyan}44`, borderRadius: 6, padding: '4px 10px', color: C.cyan, fontSize: 11, cursor: 'pointer' }}
+                  >
+                    查詢
+                  </button>
+                </div>
+              </div>
+            )}
           </Card>
 
           <Card title="執行中醫囑 (Active Orders)" icon={<Pill size={15} color={C.cyan} />}>

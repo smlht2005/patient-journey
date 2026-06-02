@@ -53,5 +53,7 @@ export default async function Dashboard() {
     }
   }
 
-  return <DashboardClient initialSummary={summary} source={source} />;
+  const iss = session.iss ?? '';
+  const isDev = session.accessToken === 'dev-no-auth';
+  return <DashboardClient initialSummary={summary} source={source} iss={iss} isDev={isDev} />;
 }

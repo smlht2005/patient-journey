@@ -12,9 +12,11 @@ import PatientJourneyDashboard from '@/components/PatientJourneyDashboard';
 interface Props {
   initialSummary: PatientSummaryVM | null;
   source: string;
+  iss: string;
+  isDev: boolean;
 }
 
-export default function DashboardClient({ initialSummary, source }: Props) {
+export default function DashboardClient({ initialSummary, source, iss, isDev }: Props) {
   const summary = initialSummary ?? MOCK_SUMMARY;
   return (
     <div>
@@ -25,10 +27,10 @@ export default function DashboardClient({ initialSummary, source }: Props) {
         </div>
       ) : (
         <div style={{ background: '#0a1424', borderBottom: '1px solid #1c3458', padding: '6px 16px', fontSize: 11.5, color: '#22c55e' }}>
-          ✅ 資料來源：HAPI FHIR (TW Core) — 即時同步
+          ✅ 資料來源：HAPI FHIR (TW Core){isDev ? ` — ${iss}` : ''} — 即時同步
         </div>
       )}
-      <PatientJourneyDashboard summary={summary} />
+      <PatientJourneyDashboard summary={summary} iss={iss} isDev={isDev} />
     </div>
   );
 }
