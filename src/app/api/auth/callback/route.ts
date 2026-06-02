@@ -36,12 +36,33 @@ export async function GET(req: NextRequest) {
     codeVerifier: session.codeVerifier,
   });
 
-  session.accessToken = token.access_token;
+  session.accessToken  = token.access_token;
   session.refreshToken = token.refresh_token;
-  session.patientId = token.patient;
-  session.expiresAt = Date.now() + token.expires_in * 1000;
-  session.codeVerifier = undefined; // 用後即清
-  session.state = undefined;
+  session.expiresAt    = Date.now() + token.expires_in * 1000;
+  session.codeVerifier = undefined;
+  session.state        = undefined;
+
+  // Standalone Launch 不回傳 patient claim → 立即從 FHIR 查第一筆 Patient
+  let patientId = token.patient;
+  if (!patientId && session.iss) {
+    try {
+      const base = session.iss.replace(/\/+$/, '');
+      const ptRes = await fetch(`${base}/Patient?_count=1`, {
+        headers: {
+          Accept:        'application/fhir+json',
+          Authorization: `Bearer ${token.access_token}`,
+        },
+        signal: AbortSignal.timeout(6_000),
+      });
+      if (ptRes.ok) {
+        const bundle = await ptRes.json();
+        patientId = bundle.entry?.[0]?.resource?.id;
+      }
+    } catch (e) {
+      console.error('[callback] patient auto-discover 失敗:', e);
+    }
+  }
+  session.patientId = patientId;
   await session.save();
 
   // 使用 NEXT_PUBLIC_BASE_URL 避免反向代理（Zeabur）將 req.url 解析為內部 localhost
