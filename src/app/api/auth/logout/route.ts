@@ -18,6 +18,9 @@ export async function POST() {
 
 // GET /api/auth/logout — 瀏覽器直接導覽登出，redirect 回首頁
 export async function GET(req: Request) {
-  const origin = new URL(req.url).origin;
-  return doLogout(`${origin}/`);
+  const url = new URL(req.url);
+  const baseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL ??
+    `${(req.headers as Headers).get('x-forwarded-proto') ?? url.protocol.replace(':', '')}://${(req.headers as Headers).get('x-forwarded-host') ?? url.host}`;
+  return doLogout(`${baseUrl}/`);
 }
