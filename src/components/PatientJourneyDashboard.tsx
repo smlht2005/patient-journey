@@ -14,7 +14,7 @@ import {
   Activity, AlertTriangle, Pill, FileText, Image as ImageIcon, Search,
   User, Mic, Send, X, CheckCircle2, Clock, ShieldAlert, Brain,
   Stethoscope, ChevronRight, Sparkles, Radio,
-  Hash, BedDouble, CalendarDays, ArrowRightLeft,
+  Hash, BedDouble, CalendarDays, ArrowRightLeft, LogOut,
 } from 'lucide-react';
 import { PatientSummaryVM, AlertVM } from '@/types/viewmodels';
 
@@ -137,6 +137,13 @@ export default function PatientJourneyDashboard({ summary, iss = '', isDev = fal
           <div style={{ width: 24, height: 24, borderRadius: '50%', background: `linear-gradient(135deg,${C.cyan},${C.violet})`, display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700, color: C.bg0 }}>S</div>
           <span style={{ fontSize: 12 }}>Dr. Sun</span>
         </div>
+        <a href="/api/auth/logout" title="登出"
+           style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 8, background: C.bg2, border: `1px solid ${C.border}`, color: C.t3, textDecoration: 'none', cursor: 'pointer' }}
+           onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = C.red; (e.currentTarget as HTMLAnchorElement).style.color = C.red; }}
+           onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.borderColor = C.border; (e.currentTarget as HTMLAnchorElement).style.color = C.t3; }}>
+          <LogOut size={14} />
+          <span style={{ fontSize: 12 }}>登出</span>
+        </a>
       </div>
 
       {flash && <div style={{ position: 'fixed', top: 64, left: '50%', transform: 'translateX(-50%)', zIndex: 60, background: C.red, color: '#fff', padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600 }}><ShieldAlert size={14} style={{ display: 'inline', marginRight: 6 }} />{flash}</div>}
