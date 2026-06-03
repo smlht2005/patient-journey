@@ -14,7 +14,7 @@ import {
   Activity, AlertTriangle, Pill, FileText, Image as ImageIcon, Search,
   User, Mic, Send, X, CheckCircle2, Clock, ShieldAlert, Brain,
   Stethoscope, ChevronRight, Sparkles, Radio,
-  Hash, BedDouble, CalendarDays, ArrowRightLeft, LogOut,
+  Hash, BedDouble, CalendarDays, LogOut,
 } from 'lucide-react';
 import { PatientSummaryVM, AlertVM } from '@/types/viewmodels';
 
@@ -130,8 +130,24 @@ export default function PatientJourneyDashboard({ summary, iss = '', isDev = fal
           <span style={{ fontSize: 10, color: C.cyan, border: `1px solid ${C.cyanDim}`, borderRadius: 6, padding: '1px 6px', fontFamily: 'monospace' }}>FHIR TW Core</span>
         </div>
         <div style={{ flex: 1, maxWidth: 460, display: 'flex', alignItems: 'center', gap: 8, background: C.bg2, border: `1px solid ${C.border}`, borderRadius: 9, padding: '6px 12px' }}>
-          <Search size={15} color={C.t3} />
-          <input placeholder="搜尋病歷 / 關鍵字…" style={{ background: 'transparent', border: 'none', outline: 'none', color: C.t1, fontSize: 13, width: '100%' }} />
+          <Search size={15} color={C.t3} style={{ flexShrink: 0 }} />
+          <input
+            placeholder={isDev ? '輸入 Patient ID 切換病人…' : '搜尋病歷 / 關鍵字…'}
+            value={switchId}
+            onChange={e => setSwitchId(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && switchId.trim() && isDev && iss) {
+                window.location.href = `/api/auth/dev-login?fhirBase=${encodeURIComponent(iss)}&patientId=${switchId.trim()}`;
+              }
+            }}
+            style={{ background: 'transparent', border: 'none', outline: 'none', color: C.t1, fontSize: 13, width: '100%' }}
+          />
+          {isDev && switchId.trim() && (
+            <button
+              onClick={() => { window.location.href = `/api/auth/dev-login?fhirBase=${encodeURIComponent(iss)}&patientId=${switchId.trim()}`; }}
+              style={{ flexShrink: 0, background: C.cyanDim, border: 'none', borderRadius: 5, padding: '2px 8px', color: C.cyan, fontSize: 11, cursor: 'pointer' }}
+            >↵</button>
+          )}
         </div>
         <div style={{ fontSize: 12, color: C.t2, display: 'flex', alignItems: 'center', gap: 5 }}><Radio size={13} color={C.green} />SMART on FHIR</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: C.bg2, border: `1px solid ${C.border}`, borderRadius: 20, padding: '4px 10px 4px 6px' }}>
@@ -182,28 +198,6 @@ export default function PatientJourneyDashboard({ summary, iss = '', isDev = fal
               <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'rgba(34,197,94,.12)', color: C.green, border: `1px solid ${C.green}44` }}>{patient.code}</span>
               <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'rgba(244,63,94,.12)', color: C.red, border: `1px solid ${C.red}44`, display: 'flex', alignItems: 'center', gap: 4 }}><AlertTriangle size={11} />{patient.allergy}</span>
             </div>
-            {isDev && iss && (
-              <div style={{ marginTop: 10, borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
-                <div style={{ fontSize: 10, color: C.t3, display: 'flex', alignItems: 'center', gap: 4, marginBottom: 5 }}>
-                  <ArrowRightLeft size={10} color={C.t3} />切換病人 (Dev)
-                </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <input
-                    placeholder="Patient ID"
-                    value={switchId}
-                    onChange={e => setSwitchId(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter' && switchId.trim()) window.location.href = `/api/auth/dev-login?fhirBase=${encodeURIComponent(iss)}&patientId=${switchId.trim()}`; }}
-                    style={{ flex: 1, background: C.bg3, border: `1px solid ${C.border}`, borderRadius: 6, padding: '4px 8px', color: C.t1, fontSize: 11, outline: 'none' }}
-                  />
-                  <button
-                    onClick={() => { if (switchId.trim()) window.location.href = `/api/auth/dev-login?fhirBase=${encodeURIComponent(iss)}&patientId=${switchId.trim()}`; }}
-                    style={{ background: C.cyanDim, border: `1px solid ${C.cyan}44`, borderRadius: 6, padding: '4px 10px', color: C.cyan, fontSize: 11, cursor: 'pointer' }}
-                  >
-                    查詢
-                  </button>
-                </div>
-              </div>
-            )}
           </Card>
 
           <Card title="執行中醫囑 (Active Orders)" icon={<Pill size={15} color={C.cyan} />}>
