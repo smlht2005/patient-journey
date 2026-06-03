@@ -1,13 +1,14 @@
-const IS_DEV   = process.env.NODE_ENV !== 'production';
-const IS_DEMO  = process.env.DEMO_MODE === 'true';
-const SHOW_ALT = IS_DEV || IS_DEMO;
-const DEV_SOURCE = process.env.DEV_FHIR_SOURCE ?? 'twcore';
-const DEV_LABEL: Record<string, string> = {
-  twcore: 'TW Core Sandbox (hapi.fhir.tw)',
-  local:  'Local FHIR Docker (localhost:9090)',
-};
+export const dynamic = 'force-dynamic';
 
 export default function Home() {
+  const IS_DEV   = process.env.NODE_ENV !== 'production';
+  const IS_DEMO  = process.env.DEMO_MODE === 'true';
+  const SHOW_ALT = IS_DEV || IS_DEMO;
+  const DEV_SOURCE = process.env.DEV_FHIR_SOURCE ?? 'twcore';
+  const DEV_LABEL: Record<string, string> = {
+    twcore: 'TW Core Sandbox (hapi.fhir.tw)',
+    local:  'Local FHIR Docker (localhost:9090)',
+  };
   return (
     <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', fontFamily: 'system-ui', background: '#050b18', color: '#e6f4ff' }}>
       <div style={{ textAlign: 'center', maxWidth: 520, padding: 24 }}>
