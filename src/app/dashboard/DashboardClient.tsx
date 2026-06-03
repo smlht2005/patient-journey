@@ -15,9 +15,10 @@ interface Props {
   iss: string;
   isDev: boolean;
   practitionerName?: string;
+  canSwitchPatient: boolean;
 }
 
-export default function DashboardClient({ initialSummary, source, iss, isDev, practitionerName }: Props) {
+export default function DashboardClient({ initialSummary, source, iss, isDev, practitionerName, canSwitchPatient }: Props) {
   const summary = initialSummary ?? MOCK_SUMMARY;
   return (
     <div>
@@ -31,7 +32,7 @@ export default function DashboardClient({ initialSummary, source, iss, isDev, pr
           ✅ 資料來源：HAPI FHIR (TW Core){isDev ? ` — ${iss}` : ''} — 即時同步
         </div>
       )}
-      <PatientJourneyDashboard summary={summary} iss={iss} isDev={isDev} practitionerName={practitionerName} />
+      <PatientJourneyDashboard summary={summary} iss={iss} isDev={isDev} practitionerName={practitionerName} canSwitchPatient={canSwitchPatient} />
     </div>
   );
 }

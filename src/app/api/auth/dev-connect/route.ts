@@ -12,13 +12,19 @@ const FHIR_SOURCES: Record<string, string> = {
 };
 
 export async function GET(req: NextRequest) {
-  if (process.env.NODE_ENV === 'production') {
+  const isDemo = process.env.DEMO_MODE === 'true';
+  if (process.env.NODE_ENV === 'production' && !isDemo) {
     return NextResponse.json({ error: 'Not Found' }, { status: 404 });
   }
 
   // query param 優先，否則讀 env，預設 twcore
   const url    = new URL(req.url);
   const source = url.searchParams.get('source') ?? process.env.DEV_FHIR_SOURCE ?? 'twcore';
+
+  // 生產環境（DEMO_MODE）不允許 local（Zeabur 無法連到 localhost:9090）
+  if (process.env.NODE_ENV === 'production' && source === 'local') {
+    return NextResponse.json({ error: 'Local FHIR 在生產環境不可用，請使用 twcore' }, { status: 400 });
+  }
 
   FHIR_SOURCES.local = process.env.DEV_FHIR_LOCAL ?? 'http://localhost:9090/fhir';
   const fhirBase = FHIR_SOURCES[source] ?? FHIR_SOURCES.twcore;

@@ -23,6 +23,7 @@ interface DashboardProps {
   iss?: string;
   isDev?: boolean;
   practitionerName?: string;
+  canSwitchPatient?: boolean;
 }
 
 const C = {
@@ -63,7 +64,7 @@ function Card({ title, icon, right, children, style }: any) {
   );
 }
 
-export default function PatientJourneyDashboard({ summary, iss = '', isDev = false, practitionerName }: DashboardProps) {
+export default function PatientJourneyDashboard({ summary, iss = '', isDev = false, practitionerName, canSwitchPatient = false }: DashboardProps) {
   const { patient, vitals, medications, journey, adherence, radar, alerts: seedAlerts } = summary;
   const [selectedDrug, setSelectedDrug] = useState(medications[0]?.id ?? '');
   const [alerts, setAlerts] = useState<AlertVM[]>(seedAlerts);
@@ -132,17 +133,17 @@ export default function PatientJourneyDashboard({ summary, iss = '', isDev = fal
         <div style={{ flex: 1, maxWidth: 460, display: 'flex', alignItems: 'center', gap: 8, background: C.bg2, border: `1px solid ${C.border}`, borderRadius: 9, padding: '6px 12px' }}>
           <Search size={15} color={C.t3} style={{ flexShrink: 0 }} />
           <input
-            placeholder={isDev ? '輸入 Patient ID 切換病人…' : '搜尋病歷 / 關鍵字…'}
+            placeholder={canSwitchPatient ? '輸入 Patient ID 切換病人…' : '搜尋病歷 / 關鍵字…'}
             value={switchId}
             onChange={e => setSwitchId(e.target.value)}
             onKeyDown={e => {
-              if (e.key === 'Enter' && switchId.trim() && isDev && iss) {
+              if (e.key === 'Enter' && switchId.trim() && canSwitchPatient && iss) {
                 window.location.href = `/api/auth/dev-login?fhirBase=${encodeURIComponent(iss)}&patientId=${switchId.trim()}`;
               }
             }}
             style={{ background: 'transparent', border: 'none', outline: 'none', color: C.t1, fontSize: 13, width: '100%' }}
           />
-          {isDev && switchId.trim() && (
+          {canSwitchPatient && switchId.trim() && (
             <button
               onClick={() => { window.location.href = `/api/auth/dev-login?fhirBase=${encodeURIComponent(iss)}&patientId=${switchId.trim()}`; }}
               style={{ flexShrink: 0, background: C.cyanDim, border: 'none', borderRadius: 5, padding: '2px 8px', color: C.cyan, fontSize: 11, cursor: 'pointer' }}

@@ -74,5 +74,7 @@ export default async function Dashboard() {
   const iss              = session.iss ?? '';
   const isDev            = session.accessToken === 'dev-no-auth';
   const practitionerName = session.practitionerName;
-  return <DashboardClient initialSummary={summary} source={source} iss={iss} isDev={isDev} practitionerName={practitionerName} />;
+  // dev-login 在生產永遠 404，病人切換功能不應顯示
+  const canSwitchPatient = process.env.NODE_ENV !== 'production';
+  return <DashboardClient initialSummary={summary} source={source} iss={iss} isDev={isDev} practitionerName={practitionerName} canSwitchPatient={canSwitchPatient} />;
 }

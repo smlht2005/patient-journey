@@ -43,6 +43,9 @@ spec:
                 value: "*"
               - key: NEXT_PUBLIC_BASE_URL
                 description: "https://<your-zeabur-domain>"
+              - key: DEMO_MODE
+                description: "啟用 TW Core Demo 模式（true = 允許無 OAuth 直連 hapi.fhir.tw；預設 false）"
+                value: "false"
               # ── Zeabur 自動注入（無需手動設定）─────────────────────────
               - key: PORT
                 description: "Zeabur 自動注入，app 透過 npm run start 讀取"
