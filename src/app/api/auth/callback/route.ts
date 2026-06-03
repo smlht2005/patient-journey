@@ -42,6 +42,32 @@ export async function GET(req: NextRequest) {
   session.codeVerifier = undefined;
   session.state        = undefined;
 
+  // 從 JWT payload 取 fhirUser → fetch Practitioner name
+  try {
+    const payload = token.access_token.split('.')[1];
+    const padded  = payload + '='.repeat((4 - payload.length % 4) % 4);
+    const claims  = JSON.parse(Buffer.from(padded, 'base64').toString('utf-8'));
+    const fhirUser: string = claims.fhirUser ?? '';
+    if (fhirUser.startsWith('Practitioner/')) {
+      const prId   = fhirUser.replace('Practitioner/', '');
+      const base   = (session.iss ?? '').replace(/\/+$/, '');
+      const prRes  = await fetch(`${base}/Practitioner/${prId}`, {
+        headers: { Accept: 'application/fhir+json', Authorization: `Bearer ${token.access_token}` },
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (prRes.ok) {
+        const pr   = await prRes.json();
+        const n    = pr.name?.[0];
+        const full = n?.text
+          ?? [[...(n?.prefix ?? []), n?.family, ...(n?.given ?? [])].filter(Boolean).join(' ')]
+             .filter(Boolean)[0];
+        if (full) session.practitionerName = full;
+      }
+    }
+  } catch (e) {
+    console.error('[callback] Practitioner fetch 失敗:', e);
+  }
+
   // Standalone Launch 不回傳 patient claim → 立即從 FHIR 查第一筆 Patient
   let patientId = token.patient;
   if (!patientId && session.iss) {

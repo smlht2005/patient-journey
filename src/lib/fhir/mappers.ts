@@ -67,12 +67,14 @@ function extVal(extensions: any[], keyword: string): string | undefined {
     ?.valueString ?? extensions.find((e: any) => norm(e.url ?? '').includes(kw))?.valueDate;
 }
 
-export function mapPatient(r: any): PatientVM {
+export function mapPatient(r: any, fallbackAttending?: string): PatientVM {
   const name = r.name?.[0];
   const displayName = name?.text ?? [name?.family, ...(name?.given ?? [])].filter(Boolean).join(' ');
   const ext        = r.extension ?? [];
   const allergy    = extVal(ext, 'allergy') ?? 'NKA';
-  const attending  = r.generalPractitioner?.[0]?.display ?? extVal(ext, 'attending') ?? '—';
+  // generalPractitioner 有 display 用 display；否則嘗試 reference display；再用 fallback（登入醫師）
+  const gpDisplay  = r.generalPractitioner?.[0]?.display;
+  const attending  = gpDisplay ?? extVal(ext, 'attending') ?? fallbackAttending ?? '—';
   const bed        = extVal(ext, 'bed')
     ?? r.identifier?.find((i: any) => i.type?.coding?.[0]?.code === 'RN')?.value ?? '—';
   const admit      = extVal(ext, 'admitdate') ?? extVal(ext, 'admit')
@@ -258,8 +260,8 @@ export function mapAdherence(resources: any[]): AdherenceVM[] {
     .map((r: any) => ({ ts: formatDateTime(r.effectiveDateTime ?? ''), dose: r.dosage?.text ?? '—', giver: r.performer?.[0]?.actor?.display ?? 'RN', ok: r.status === 'completed' }));
 }
 
-export function buildPatientSummary(patient: any, resources: any[]): PatientSummaryVM {
-  const patientVM    = mapPatient(patient);
+export function buildPatientSummary(patient: any, resources: any[], practitionerName?: string): PatientSummaryVM {
+  const patientVM    = mapPatient(patient, practitionerName);
   const observations = mapObservations(resources);
   const medications  = mapMedications(resources);
   const vitals       = mapVitals(resources);

@@ -22,6 +22,7 @@ interface DashboardProps {
   summary: PatientSummaryVM;
   iss?: string;
   isDev?: boolean;
+  practitionerName?: string;
 }
 
 const C = {
@@ -62,7 +63,7 @@ function Card({ title, icon, right, children, style }: any) {
   );
 }
 
-export default function PatientJourneyDashboard({ summary, iss = '', isDev = false }: DashboardProps) {
+export default function PatientJourneyDashboard({ summary, iss = '', isDev = false, practitionerName }: DashboardProps) {
   const { patient, vitals, medications, journey, adherence, radar, alerts: seedAlerts } = summary;
   const [selectedDrug, setSelectedDrug] = useState(medications[0]?.id ?? '');
   const [alerts, setAlerts] = useState<AlertVM[]>(seedAlerts);
@@ -134,8 +135,10 @@ export default function PatientJourneyDashboard({ summary, iss = '', isDev = fal
         </div>
         <div style={{ fontSize: 12, color: C.t2, display: 'flex', alignItems: 'center', gap: 5 }}><Radio size={13} color={C.green} />SMART on FHIR</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: C.bg2, border: `1px solid ${C.border}`, borderRadius: 20, padding: '4px 10px 4px 6px' }}>
-          <div style={{ width: 24, height: 24, borderRadius: '50%', background: `linear-gradient(135deg,${C.cyan},${C.violet})`, display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700, color: C.bg0 }}>S</div>
-          <span style={{ fontSize: 12 }}>Dr. Sun</span>
+          <div style={{ width: 24, height: 24, borderRadius: '50%', background: `linear-gradient(135deg,${C.cyan},${C.violet})`, display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700, color: C.bg0 }}>
+            {(practitionerName ?? 'Dr. tmhtc')[0].toUpperCase()}
+          </div>
+          <span style={{ fontSize: 12 }}>{practitionerName ?? 'Dr. tmhtc'}</span>
         </div>
         <a href="/api/auth/logout" title="登出"
            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 8, background: C.bg2, border: `1px solid ${C.border}`, color: C.t3, textDecoration: 'none', cursor: 'pointer' }}

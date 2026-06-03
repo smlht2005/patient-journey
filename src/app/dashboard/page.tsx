@@ -63,7 +63,7 @@ export default async function Dashboard() {
         toResources(medRes), toResources(admRes),
       ]);
 
-      summary = buildPatientSummary(patient, [...observations, ...diagnostics, ...medications, ...administrations]);
+      summary = buildPatientSummary(patient, [...observations, ...diagnostics, ...medications, ...administrations], session.practitionerName);
       source  = 'fhir';
     } catch (err) {
       console.error('[dashboard]', err);
@@ -71,7 +71,8 @@ export default async function Dashboard() {
     }
   }
 
-  const iss = session.iss ?? '';
-  const isDev = session.accessToken === 'dev-no-auth';
-  return <DashboardClient initialSummary={summary} source={source} iss={iss} isDev={isDev} />;
+  const iss              = session.iss ?? '';
+  const isDev            = session.accessToken === 'dev-no-auth';
+  const practitionerName = session.practitionerName;
+  return <DashboardClient initialSummary={summary} source={source} iss={iss} isDev={isDev} practitionerName={practitionerName} />;
 }

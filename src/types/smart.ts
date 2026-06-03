@@ -27,4 +27,5 @@ export interface SmartSession {
   refreshToken?: string;
   patientId?: string;
   expiresAt?: number; // epoch ms
+  practitionerName?: string; // 登入醫師姓名（從 fhirUser claim 解析）
 }
