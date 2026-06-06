@@ -6,6 +6,31 @@
 
 ---
 
+## 🔰 新手導讀 — 讀這份文件之前先懂這些
+
+> 本文件預設讀者具備系統架構背景，但以下術語對醫療 IT 初學者可能陌生。
+> 每個章節也會在關鍵處附上 💡 新手說明，可搭配閱讀。
+
+### 核心術語速查
+
+| 術語 | 白話解釋 |
+|------|---------|
+| **FHIR (R4)** | 醫療資料的「共同語言」標準，把病人、藥物、檢驗等資料統一成 JSON 格式，讓不同系統可以溝通。R4 是目前最常用的版本。 |
+| **TW Core** | 台灣衛福部基於 FHIR 制定的本地化規範，規定哪些欄位必填、使用哪些代碼系統（如身分證格式）。 |
+| **SMART on FHIR** | 讓第三方 App（如本系統）安全地向 HIS/EMR 要求存取病人資料的授權協定。類似「用 Google 帳號登入第三方網站」，只是用在醫療系統。 |
+| **PKCE** | OAuth 2.0 的安全強化流程。用一組「隨機暗語」避免授權碼被中途截取。網頁 App（無法藏密鑰）必須使用。 |
+| **BFF (Backend For Frontend)** | 後端替前端做中間人。瀏覽器不直接碰 FHIR Server，而是請後端 API 去拿資料再回傳。好處是 token 不會暴露在瀏覽器。 |
+| **iron-session** | 把使用者狀態（token、病人 ID）加密存在瀏覽器 Cookie 裡的函式庫。Server 讀取時解密，比傳統 session DB 更適合雲端部署。 |
+| **CDS Hooks** | 醫師在 HIS 系統開藥時，HIS 會自動通知本系統「有醫囑了，要不要提醒什麼？」本系統回傳警示卡片，醫師可接受或忽略。 |
+| **SSR / RSC** | Server-Side Rendering / React Server Component：頁面在伺服器端組好 HTML 再送給瀏覽器，而非在瀏覽器執行 JS 後才顯示。 |
+| **LLM** | 大型語言模型，如 Claude、DeepSeek，用來做 AI 摘要、臨床對話、自然語言轉醫囑。 |
+| **Standalone Launch** | 使用者直接開啟本 App（不是從 HIS 跳轉），此時沒有 EHR 提供的病人 context，需要自己去 FHIR Server 找病人。 |
+| **EHR Launch** | 從醫院 HIS 系統點擊後跳轉到本 App，HIS 會在 URL 帶入病人與就診 context。 |
+| **sentinel value** | 特殊的「暗號字串」（本系統用 `'dev-no-auth'`），讓程式碼知道「現在是開發測試模式，不要用正常的 OAuth token」。 |
+| **LOINC** | 國際標準的檢驗/觀測代碼系統，每種檢驗項目都有唯一代碼（例如 HbA1c = 4548-4）。 |
+
+---
+
 ## 1. Bird's Eye Architecture 整體架構
 
 ```
@@ -81,9 +106,28 @@
     → BLOCKED in production unless DEMO_MODE=true (dev-login always 404 in prod)
 ```
 
+> 💡 **新手說明 — 讀圖重點**
+>
+> 整個系統分三層，由外到內：
+> 1. **瀏覽器（Browser）**：使用者看到的畫面，由 React 元件組成。它**不直接連 FHIR 或 LLM**，一切都透過後端。
+> 2. **Next.js 伺服器**：兩個角色並存——「頁面伺服器」負責組好 HTML（Server Component）；「API 伺服器」負責做 FHIR 查詢、OAuth 換 token、呼叫 AI（BFF）。
+> 3. **外部服務**：FHIR Server（病人資料）、LLM（AI 功能）。本系統只是橋樑，不自己儲存病人資料。
+>
+> **兩條登入路線**：
+> - 正式流程：走 SMART OAuth PKCE，取得授權才能看病人資料（適合真實醫院）
+> - 開發/Demo 捷徑：直接設 `dev-no-auth` 暗號，跳過 OAuth，快速連 TW Core Sandbox 展示（不含真實個資）
+
 ---
 
 ## 2. Module Inventory 模組清單
+
+> 💡 **新手說明**：這張表把所有程式檔分成六組。閱讀時重點看「Responsibility（這個檔案做什麼）」和「Depends On（它需要誰）」這兩欄，能幫你快速理解依賴關係。不需要背每個檔案，先記住每組的職責就夠了：
+> - **Auth**：處理登入/登出/OAuth 換 token
+> - **FHIR**：和 FHIR Server 溝通、把 FHIR JSON 轉成畫面用的資料
+> - **AI/LLM**：呼叫 Claude 或 DeepSeek 做 AI 功能
+> - **CDS Hooks**：接收 HIS 的醫囑通知、產生警示卡片
+> - **Session**：管理「這個使用者是誰、有沒有登入」的狀態
+> - **UI**：畫面元件，最終呈現給醫師看
 
 ### Auth
 
@@ -154,6 +198,14 @@
 
 ## 3. Critical Design Decisions 關鍵設計決策
 
+> 💡 **新手說明**：這章記錄的是「為什麼這樣設計，而不是那樣設計」。每個決策都有四個面向：
+> - **Problem**：遇到了什麼問題
+> - **Decision**：最後怎麼決定的
+> - **Why**：為什麼這樣決定
+> - **Trade-off**：這個決定犧牲了什麼
+>
+> 讀這章的目的不是要你馬上改程式，而是**下次有人問「為什麼不用 JWT / 為什麼不直接讓前端打 FHIR」時，你知道答案**。
+
 ### 3.1 Session Store: iron-session cookie vs JWT
 
 | 面向 | 內容 |
@@ -162,6 +214,8 @@
 | **Decision** | 使用 iron-session：以 `SESSION_SECRET` 加密的 httpOnly cookie，儲存 `SmartSession` 物件 |
 | **Why** | Server-only（不暴露 token 至 client JS）；無需外部 Redis；與 App Router `cookies()` 原生整合；AES-GCM 加密 |
 | **Trade-off** | cookie 大小限制（~4KB）；若 SESSION_SECRET 輪換，所有存活 session 失效；無跨節點 revoke 能力 |
+
+> 💡 **白話版**：OAuth token 是「進入 FHIR Server 的鑰匙」。如果放在瀏覽器（LocalStorage 或 JS 變數），駭客用 XSS 就能偷走。iron-session 把它加密存在 Cookie，瀏覽器 JS 看不到，只有我們的後端能解密。
 
 ### 3.2 BFF Pattern (no direct client→FHIR)
 
@@ -172,6 +226,8 @@
 | **Why** | 符合 SMART App launch 安全規範；阻止 XSS 竊取 Bearer token；統一審計點 |
 | **Trade-off** | 每次 FHIR 請求多一個 BFF hop（+latency）；BFF 成為單點瓶頸 |
 
+> 💡 **白話版**：BFF 像餐廳的「服務生」——客人（瀏覽器）不直接進廚房（FHIR Server），點餐給服務生，服務生去取餐再端出來。鑰匙（token）永遠在廚房，客人拿不到。
+
 ### 3.3 force-dynamic vs Static Export
 
 | 面向 | 內容 |
@@ -180,6 +236,8 @@
 | **Decision** | 所有涉及 session 的 route 明確標記 `export const dynamic = 'force-dynamic'`（包含 `app/page.tsx`, `app/dashboard/page.tsx`, `api/patient-summary`, `api/debug/session`, `api/auth/dev-connect`） |
 | **Why** | 防止 build-time throw；確保每次 request 都重新讀取 session；`next.config.mjs` 使用 `output: 'standalone'` 而非 `export` |
 | **Trade-off** | 無法使用 CDN 快取這些頁面；每 request 都需 Node.js 執行 |
+
+> 💡 **白話版**：Next.js 預設會在「打包（build）」時把頁面預先算好，省效能。但我們的頁面需要讀 Cookie（誰登入了？），Cookie 在 build 時不存在，所以必須每次 request 都重新執行（force-dynamic）。就像「今日特餐」每天現做，而非昨天就煮好放著。
 
 ### 3.4 dev-no-auth Sentinel Token
 
@@ -190,6 +248,8 @@
 | **Why** | 不污染 OAuth flow；FHIR client 單一函式處理兩種模式；生產環境 `dev-login` 永遠回傳 404 |
 | **Trade-off** | Sentinel 為 magic string，修改時需同步更新 `client.ts`（L48）與兩個 auth routes |
 
+> 💡 **白話版**：開發時不想每次都走 OAuth 流程（要有 sandbox 帳號、要等 redirect），所以設計一個「偷吃步」——把 token 換成暗號字串 `'dev-no-auth'`，程式碼看到這個就知道「這是測試模式，直接連 FHIR，不用帶 Bearer token」。正式環境這條路是關閉的（回傳 404）。
+
 ### 3.5 LLM Provider Abstraction (claude/deepseek)
 
 | 面向 | 內容 |
@@ -198,6 +258,8 @@
 | **Decision** | `llmClient.ts` 作為 facade；讀取 `LLM_PROVIDER` env 選擇實作；共用 `LLMCallOptions` 介面；未知 provider fallback deepseek |
 | **Why** | 成本/速度 tradeoff 可透過環境變數調整（DeepSeek 為預設）；介面隔離讓 provider 可獨立替換 |
 | **Trade-off** | Claude 的 `system` 為獨立 param；DeepSeek 轉為 messages[0] role=system，語意略有差異；streaming 目前未實作 |
+
+> 💡 **白話版**：把 LLM 的使用包在一個「翻譯層」裡。你說「用 AI 做摘要」，翻譯層負責決定叫 Claude 還是 DeepSeek，上層呼叫者完全不用管。想換 AI？改一個環境變數就好，程式碼不用動。
 
 ### 3.6 SMART Standalone Launch Patient Auto-Discover
 
@@ -208,6 +270,8 @@
 | **Why** | TW Core Sandbox (hapi.fhir.tw) 不回傳 patient claim；Demo 流程需無縫降級 |
 | **Trade-off** | 永遠取第一筆 Patient（適合 POC；正式需 patient picker UI）；多一次 FHIR round-trip |
 
+> 💡 **白話版**：當你直接輸入網址打開 App（Standalone），沒有 HIS 告訴你「這個病人 ID 是 xxx」。SMART Server 的 token 回應也不附病人 ID（這是規格上的設計）。所以我們在 token 換好之後，立刻自己去 FHIR 問「你這裡第一筆 Patient 是誰？」——Demo 和 POC 場景夠用，正式要換成病人選擇畫面。
+
 ### 3.7 DEMO_MODE env for Production TW Core Access
 
 | 面向 | 內容 |
@@ -217,9 +281,18 @@
 | **Why** | 滿足 POC 對外展示需求，同時阻止 `local` source（生產環境 Zeabur 無 localhost:9090） |
 | **Trade-off** | `DEMO_MODE=true` + `production` 組合下，`dev-no-auth` sentinel 流入生產 session，無 SMART token 保護；**不適合含真實 PHI 的生產環境** |
 
+> 💡 **白話版**：TW Core Sandbox（hapi.fhir.tw）是公開的測試 FHIR Server，沒有 OAuth，任何人都能查。但正式環境（Zeabur）不允許跳過 OAuth。加一個環境變數 `DEMO_MODE=true` 作為「開關」，讓 Zeabur 也能直連 TW Core Sandbox 展示，同時阻止連本機 localhost（Zeabur 上根本沒有 localhost:9090）。**注意：這個模式不含真實病患個資，僅用於展示。**
+
 ---
 
 ## 4. Data Flow Walkthroughs 資料流程
+
+> 💡 **新手說明**：這章把三個最重要的「資料旅程」拆成一步一步說明，每步都標注是哪個檔案/函式在處理。
+> - **Flow A**：使用者如何登入（OAuth 走完整 11 步）
+> - **Flow B**：登入後畫面怎麼抓病人資料來顯示（FHIR 查詢 + 資料轉換）
+> - **Flow C**：醫師開藥時 HIS 怎麼問我們要不要警示（CDS Hooks 10 步）
+>
+> 建議初學者先讀 Flow B（最直觀），再讀 Flow A（理解登入），最後讀 Flow C（理解 CDS 整合）。
 
 ### Flow A: SMART OAuth PKCE Flow（launch → callback → dashboard）
 
@@ -374,6 +447,8 @@ Step  File/Function                          Action
 
 ## 5. Key Invariants & Constraints 關鍵限制
 
+> 💡 **新手說明**：「Invariants（不變量）」是指「不管你改了什麼，這些規則永遠要成立，否則系統會出錯」。這章列出的每一條，都是曾經踩過坑、或者一旦違反就會出現難以 debug 的問題。**修改任何程式碼前先讀這章**，確認你沒有違反這些規則。
+
 - **`force-dynamic` 必要性**：所有讀取 `cookies()` 的 Server Component 或 Route Handler 必須標記 `export const dynamic = 'force-dynamic'`。`session/store.ts` 的 `getSession()` 在 build time 呼叫 `cookies()` 會 throw；`SESSION_SECRET` guard 在 request time 才執行，不在 build time 執行（`store.ts` L18–25）。
 
 - **SESSION_SECRET guard 位置**：guard 在 `getSession()` 被呼叫時執行，而非 module load time。這允許 `next build` 在沒有 `SESSION_SECRET` 的 CI 環境成功，但任何 runtime session 讀取都會 throw（`store.ts` L19–24）。
@@ -396,6 +471,13 @@ Step  File/Function                          Action
 
 ## 6. Security Boundary Map 安全邊界
 
+> 💡 **新手說明**：這張表問的是「哪個 API 入口，誰可以打、打了有什麼風險」。
+> - **Auth Required**：打這個 API 需要先登入嗎？
+> - **Production Guard**：在正式環境有沒有額外防護？
+> - **Risk if Misconfigured**：如果防護沒設好，最壞的情況是什麼？
+>
+> **特別注意標記「高風險」的項目**：`/api/debug/session`（無生產防護，會洩漏 token 資訊）和 `/api/ai/*`（無 session 驗證，API Key 可能被濫用）。正式上線前這兩組必須處理。
+
 | Endpoint | Auth Required | Production Guard | Risk if Misconfigured |
 |----------|---------------|------------------|-----------------------|
 | `GET /api/auth/launch` | 無（OAuth 起點） | SSRF 防護（scheme + 內網 IP 阻擋）；生產強制 HTTPS ISS | SSRF：攻擊者控制 `?iss` 可探測內網服務 |
@@ -416,6 +498,8 @@ Step  File/Function                          Action
 ---
 
 ## 7. Extension Points 擴充點
+
+> 💡 **新手說明**：這章是「我想加功能，從哪裡改起」的指南。每個擴充點列出了需要動哪些檔案、按什麼順序改。**初學者的第一個練習建議從 7.1（新增 FHIR Resource）開始**——流程最清晰，改完就能在畫面上看到結果。
 
 ### 7.1 新增 FHIR Resource
 
