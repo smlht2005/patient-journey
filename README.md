@@ -317,6 +317,90 @@ docs/
 
 ---
 
+## 程式碼白話導覽 — 給第一次看這個專案的你
+
+> 看完目錄結構還是不知道從哪裡下手？這章用最簡單的說法解釋「每個資料夾在做什麼」。
+
+### 🗂 `src/lib/` — 所有「幕後工人」都在這裡
+
+| 資料夾 | 在做什麼 | 新手可以先看 |
+|--------|---------|------------|
+| `lib/fhir/client.ts` | 去 FHIR Server 拿資料的工具。帶著 token，設定 15 秒超時，自動偵測是否為測試模式（不帶 token）。 | 是 |
+| `lib/fhir/mappers.ts` | FHIR 資料長得像複雜的 JSON，這裡負責把它「翻譯」成畫面看得懂的格式（例如把 Observation 變成圖表用的數字）。 | 是 |
+| `lib/fhir/mock.ts` | 假資料（病人陳大明）。沒有登入 / 沒有 FHIR Server 時，系統預設顯示這份資料，讓你可以直接看畫面。 | 是 |
+| `lib/smart/` | 三個幫手：`discovery.ts` 去問 FHIR Server「你的登入頁在哪裡」；`pkce.ts` 產生登入用的隨機安全碼；`tokenExchange.ts` 用授權碼換取 access token。 | 想理解 OAuth 再看 |
+| `lib/session/store.ts` | 記住「誰在登入中」的地方。把 token、病人 ID 加密存在 Cookie，讓每次 request 都能知道是誰在操作。 | 是 |
+| `lib/ai/llmClient.ts` | AI 功能的總開關。根據環境變數 `LLM_PROVIDER` 決定叫 Claude 還是 DeepSeek。 | 是 |
+| `lib/ai/summarizer.ts` | 把病人資料整理成三種摘要：交班用（handoff）、查房用（rounds）、簡短版（brief）。 | — |
+| `lib/ai/voiceOrderParser.ts` | 把醫師說的話（「病人水腫，開 Lasix 40mg IV STAT」）轉成 FHIR 藥囑格式。 | — |
+| `lib/cds/drugInteractions.ts` | 內建 6 條藥物交互作用規則（例如 Warfarin + Aspirin 一起開就警告）。 | 是 |
+| `lib/cds/thresholdAlerts.ts` | 8 個 LOINC 檢驗值閾值規則（例如 SBP > 160 就警示）。 | 是 |
+| `lib/cds/cardBuilder.ts` | 把 DDI 警示 + 閾值警示 + AI 建議合在一起，排序後最多回傳 8 張警示卡（避免警示太多讓醫師麻痺）。 | — |
+
+---
+
+### 🗂 `src/app/` — 使用者看到的頁面 + 後端 API
+
+```
+app/
+├── page.tsx              ← 首頁（登入入口）
+├── dashboard/
+│   ├── page.tsx          ← 拿 FHIR 資料的「伺服器頁面」（使用者看不到它在跑）
+│   └── DashboardClient.tsx ← 把拿到的資料傳給畫面元件
+└── api/
+    ├── auth/             ← 所有登入相關（OAuth 換 token、登出、測試模式捷徑）
+    ├── patient-summary/  ← 一口氣撈 4 種 FHIR 資料再整理（BFF 核心）
+    ├── ai/               ← AI 功能（對話 / 摘要 / 語音開立）
+    ├── cds-hooks/        ← 接收 HIS 開藥通知、回傳警示卡片
+    ├── fhir/[...path]/   ← 前端要直接查 FHIR 的代理路口（帶 token）
+    └── health/           ← 健康檢查（Zeabur 自動偵測服務是否活著用）
+```
+
+---
+
+### 🔄 資料怎麼流到畫面上（三行版）
+
+```
+1. 使用者開啟 /dashboard
+2. 伺服器（dashboard/page.tsx）讀取 Cookie → 帶 token 去 FHIR 撈 5 種資料 → mappers.ts 翻譯成畫面格式
+3. 傳給 DashboardClient → PatientJourneyDashboard 渲染圖表和資訊卡
+```
+
+沒有登入 → 跳到 Mock 資料（lib/fhir/mock.ts），畫面一樣能看但是假資料（黃色 Banner 提示）。
+
+---
+
+### 🧭 新手建議閱讀順序
+
+從最容易理解的開始，逐步深入：
+
+| 階段 | 先看這個 | 你會學到 |
+|------|---------|---------|
+| ① 看假資料長什麼樣 | `src/lib/fhir/mock.ts` | 了解 ViewModel 結構 |
+| ② 看 FHIR 怎麼翻譯 | `src/lib/fhir/mappers.ts` 中的 `mapPatient()` | 了解 FHIR JSON → 畫面 |
+| ③ 看 FHIR 怎麼查詢 | `src/lib/fhir/client.ts` 中的 `fhirFetch()` | 了解 HTTP 請求 + token |
+| ④ 看頁面怎麼串起來 | `src/app/dashboard/page.tsx` | 了解 Server Component + 資料流 |
+| ⑤ 看 OAuth 流程 | `src/app/api/auth/launch/route.ts` → `callback/route.ts` | 了解 PKCE 登入 |
+| ⑥ 看 CDS Hooks 警示 | `src/lib/cds/drugInteractions.ts` → `cardBuilder.ts` | 了解規則引擎 |
+
+---
+
+### ❓ 常見問題（新手版）
+
+**Q：我改了 `mappers.ts`，畫面怎麼沒變？**
+A：確認你改的是 mappers 的輸出有接到 ViewModel 型別（`src/types/viewmodels.ts`），然後重新整理瀏覽器。Server Component 沒有 hot reload，需要 `npm run dev` 重新觸發。
+
+**Q：怎麼知道現在是 Mock 還是真實 FHIR？**
+A：看 Dashboard 頂部 Banner 顏色：**黃色** = Mock 假資料，**綠色** = 真實 FHIR Server。
+
+**Q：`dev-no-auth` 這個字串是什麼？**
+A：一個暗號。`session.accessToken` 被設成這個字串時，`fhirFetch()` 就知道「現在是測試模式，不用帶 Bearer token」。只在本機開發或 DEMO_MODE 時會出現。
+
+**Q：我想加一個新的 FHIR 欄位，改哪裡？**
+A：依序改這四個：`types/viewmodels.ts`（加型別）→ `lib/fhir/mappers.ts`（加翻譯邏輯）→ `app/dashboard/page.tsx`（加 fhirFetch）→ `components/PatientJourneyDashboard.tsx`（加 UI 顯示）。詳見 `docs/code_desc.md` Section 7.1。
+
+---
+
 ## 安全要點
 
 - **PKCE (S256)**：防授權碼攔截
@@ -332,9 +416,11 @@ docs/
 
 | 文件 | 涵蓋內容 |
 |------|---------|
+| `docs/code_desc.md` | **SA 架構文件**（含新手導讀）：模組清單、設計決策、資料流、安全邊界、擴充點 |
 | `docs/troubleshooting-smart-auth.md` | SMART OAuth 基本授權流程問題 |
 | `docs/troubleshooting-zeabur-deploy.md` | Zeabur build 失敗（SESSION_SECRET、force-dynamic、package-lock） |
 | `docs/troubleshooting-smart-standalone-launch.md` | Standalone Launch 無 patient claim、localhost:8080 redirect、variable env 覆蓋 |
+| `docs/sop-claude-code-new-session-hotkey.md` | Windows Terminal 新 session 快捷鍵設定 SOP |
 
 ---
 
