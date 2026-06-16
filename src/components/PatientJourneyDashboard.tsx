@@ -12,11 +12,12 @@ import {
 } from 'recharts';
 import {
   Activity, AlertTriangle, Pill, FileText, Image as ImageIcon, Search,
-  User, Mic, Send, X, CheckCircle2, Clock, ShieldAlert, Brain,
+  User, Send, X, CheckCircle2, Clock, ShieldAlert, Brain,
   Stethoscope, ChevronRight, Sparkles, Radio,
   Hash, BedDouble, CalendarDays, LogOut,
 } from 'lucide-react';
 import { PatientSummaryVM, AlertVM } from '@/types/viewmodels';
+import AiVoicePanel from './AiVoicePanel';
 
 interface DashboardProps {
   summary: PatientSummaryVM;
@@ -70,10 +71,6 @@ export default function PatientJourneyDashboard({ summary, iss = '', isDev = fal
   const [alerts, setAlerts] = useState<AlertVM[]>(seedAlerts);
   const [expanded, setExpanded] = useState(journey[0]?.id ?? '');
   const [aiMsgs, setAiMsgs] = useState(AI_SEED);
-  const [orderText, setOrderText] = useState('');
-  const [fhir, setFhir] = useState<any>(null);
-  const [signed, setSigned] = useState(false);
-  const [flash, setFlash] = useState<string | null>(null);
   const [aiInput, setAiInput] = useState('');
   const [switchId, setSwitchId] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -81,31 +78,6 @@ export default function PatientJourneyDashboard({ summary, iss = '', isDev = fal
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [aiMsgs]);
-
-  const scanOrder = (txt: string) => {
-    const t = txt.toLowerCase();
-    if ((t.includes('warfarin') || t.includes('可邁丁')) && (t.includes('aspirin') || t.includes('阿斯匹靈'))) {
-      if (!alerts.find((a) => a.id === 'live')) {
-        setAlerts((p) => [{ id: 'live', level: 'danger', title: '即時攔截：Warfarin + Aspirin', body: '輸入醫囑觸發嚴重交互作用，出血風險升高。', tag: 'Live-Intercept' }, ...p]);
-        setFlash('已即時攔截 Warfarin + Aspirin 高風險組合');
-        setTimeout(() => setFlash(null), 2600);
-      }
-    }
-  };
-
-  const buildFhir = () => {
-    const txt = orderText || '病人有體液滯留，開立 Lasix 40mg IV STAT';
-    const isLasix = /lasix|furosemide|利尿/i.test(txt);
-    setFhir({
-      resourceType: 'MedicationRequest', status: 'draft', intent: 'order',
-      priority: /stat|立即/i.test(txt) ? 'stat' : 'routine',
-      medicationCodeableConcept: { text: isLasix ? 'Furosemide (Lasix) 40 mg' : txt },
-      subject: { reference: `Patient/${patient.mrn}`, display: patient.name },
-      dosageInstruction: [{ text: isLasix ? '40 mg IV Push, STAT' : txt }],
-      meta: { profile: ['https://twcore.mohw.gov.tw/ig/twcore/StructureDefinition/MedicationRequest-twcore'] },
-    });
-    setSigned(false);
-  };
 
   const sendAi = (text: string) => {
     if (!text.trim()) return;
@@ -166,7 +138,6 @@ export default function PatientJourneyDashboard({ summary, iss = '', isDev = fal
         </a>
       </div>
 
-      {flash && <div style={{ position: 'fixed', top: 64, left: '50%', transform: 'translateX(-50%)', zIndex: 60, background: C.red, color: '#fff', padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600 }}><ShieldAlert size={14} style={{ display: 'inline', marginRight: 6 }} />{flash}</div>}
 
       {/* Grid — 桌面三欄，手機單欄 */}
       <style>{`@media(min-width:900px){.pj-grid{grid-template-columns:minmax(240px,280px) minmax(0,1fr) minmax(280px,340px)!important}}`}</style>
@@ -349,23 +320,12 @@ export default function PatientJourneyDashboard({ summary, iss = '', isDev = fal
             </div>
           </Card>
 
-          <Card title="語音／文字 → FHIR 醫囑" icon={<Mic size={15} color={C.cyan} />}>
-            <textarea value={orderText} onChange={e => { setOrderText(e.target.value); scanOrder(e.target.value); }} placeholder="例：Warfarin 5mg + Aspirin 100mg（觸發即時攔截）" rows={3} style={{ width: '100%', resize: 'vertical', background: C.bg2, border: `1px solid ${C.border}`, borderRadius: 8, color: C.t1, fontSize: 12, padding: 8, outline: 'none', boxSizing: 'border-box' }} />
-            <button onClick={buildFhir} style={{ width: '100%', marginTop: 8, cursor: 'pointer', background: `linear-gradient(135deg,${C.cyan},${C.cyanDim})`, color: C.bg0, border: 'none', borderRadius: 8, padding: '8px 0', fontSize: 12.5, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              <Sparkles size={14} /> 生成 FHIR 草稿
-            </button>
-            {fhir && (
-              <div style={{ marginTop: 10, background: C.bg0, border: `1px solid ${C.borderLit}`, borderRadius: 8, overflow: 'hidden' }}>
-                <div style={{ padding: '6px 10px', background: C.bg2, borderBottom: `1px solid ${C.border}`, fontSize: 11, color: C.cyan, fontFamily: 'monospace' }}>MedicationRequest · TW Core profile</div>
-                <pre style={{ margin: 0, padding: 10, fontSize: 10.5, color: C.t2, fontFamily: 'monospace', maxHeight: 160, overflow: 'auto', whiteSpace: 'pre-wrap' }}>{JSON.stringify(fhir, null, 2)}</pre>
-                <div style={{ padding: 8, borderTop: `1px solid ${C.border}` }}>
-                  {signed
-                    ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: C.green, fontSize: 12.5, fontWeight: 700 }}><CheckCircle2 size={15} />已簽署並開立</div>
-                    : <button onClick={() => setSigned(true)} style={{ width: '100%', cursor: 'pointer', background: C.green, color: C.bg0, border: 'none', borderRadius: 7, padding: '7px 0', fontSize: 12.5, fontWeight: 700 }}>確認簽署並開立</button>}
-                </div>
-              </div>
-            )}
-          </Card>
+          <AiVoicePanel
+            summary={summary}
+            onNewAlert={(title, body, level) =>
+              setAlerts((p) => [{ id: `ai-${Date.now()}`, level, title, body, tag: 'AI-Order' }, ...p])
+            }
+          />
         </div>
       </div>
     </div>

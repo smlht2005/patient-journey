@@ -41,6 +41,9 @@ export default function AiVoicePanel({ summary, onNewAlert }: Props) {
   const [isRecording, setIsRecording] = useState(false);
   const [fhirDraft, setFhirDraft] = useState<FhirMedicationRequest | null>(null);
   const [signed, setSigned] = useState(false);
+  const [signing, setSigning] = useState(false);
+  const [signError, setSignError] = useState<string | null>(null);
+  const [signedId, setSignedId] = useState<string | null>(null);
   const [orderLoading, setOrderLoading] = useState(false);
   const [orderWarnings, setOrderWarnings] = useState<string[]>([]);
   const [confidence, setConfidence] = useState<number | null>(null);
@@ -93,6 +96,8 @@ export default function AiVoicePanel({ summary, onNewAlert }: Props) {
     setFhirDraft(null);
     setOrderWarnings([]);
     setSigned(false);
+    setSignError(null);
+    setSignedId(null);
 
     try {
       const res = await fetch('/api/ai/voice-order', {
@@ -120,6 +125,31 @@ export default function AiVoicePanel({ summary, onNewAlert }: Props) {
       setOrderWarnings(['網路錯誤，請確認 API key 是否設定']);
     } finally {
       setOrderLoading(false);
+    }
+  };
+
+  // ── 簽署並開立 → 寫入 FHIR ───────────────────────────────────────────────
+  const signOrder = async () => {
+    if (!fhirDraft) return;
+    setSigning(true);
+    setSignError(null);
+    try {
+      const res = await fetch('/api/fhir/MedicationRequest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/fhir+json' },
+        body: JSON.stringify({ ...fhirDraft, status: 'active' }),
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`FHIR ${res.status}：${txt.slice(0, 160)}`);
+      }
+      const created = await res.json();
+      setSignedId(created.id ?? null);
+      setSigned(true);
+    } catch (e) {
+      setSignError((e as Error).message);
+    } finally {
+      setSigning(false);
     }
   };
 
@@ -249,8 +279,11 @@ export default function AiVoicePanel({ summary, onNewAlert }: Props) {
                 </pre>
                 <div style={{ padding: 10, borderTop: `1px solid ${C.border}` }}>
                   {signed
-                    ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: C.green, fontWeight: 700, fontSize: 13 }}><CheckCircle2 size={16} />已簽署並開立</div>
-                    : <button onClick={() => setSigned(true)} style={{ width: '100%', cursor: 'pointer', background: C.green, color: C.bg0, border: 'none', borderRadius: 8, padding: '8px 0', fontSize: 13, fontWeight: 700 }}>確認簽署並開立</button>}
+                    ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: C.green, fontWeight: 700, fontSize: 13 }}><CheckCircle2 size={16} />已開立至 FHIR{signedId ? ` · ${signedId}` : ''}</div>
+                    : <button onClick={signOrder} disabled={signing} style={{ width: '100%', cursor: signing ? 'default' : 'pointer', background: signing ? C.bg3 : C.green, color: signing ? C.t3 : C.bg0, border: 'none', borderRadius: 8, padding: '8px 0', fontSize: 13, fontWeight: 700 }}>{signing ? '寫入 FHIR 中…' : '確認簽署並開立'}</button>}
+                  {signError && (
+                    <div style={{ marginTop: 8, fontSize: 11, color: C.amber, display: 'flex', gap: 6 }}><AlertTriangle size={12} style={{ marginTop: 1, flexShrink: 0 }} />{signError}</div>
+                  )}
                 </div>
               </div>
             )}

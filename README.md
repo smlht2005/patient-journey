@@ -268,7 +268,23 @@ ANTHROPIC_API_KEY=sk-ant-...
 |-----|------|
 | `POST /api/ai/chat` | 臨床 AI 對話（含病人 context） |
 | `POST /api/ai/summarize` | 三模式摘要（brief / handoff / rounds） |
-| `POST /api/ai/voice-order` | 語音醫囑 → FHIR MedicationRequest（TW Core） |
+| `POST /api/ai/voice-order` | 語音醫囑 → FHIR MedicationRequest 草稿（TW Core） |
+
+### 語音開立 → 簽署寫入 FHIR（完整流程）
+
+Dashboard 右欄的 **AI 服務面板**（`components/AiVoicePanel.tsx`）已掛入主畫面，三個 tab（語音醫囑 / 對話 / 摘要）皆呼叫上述真實 API（不再是前端模擬）。語音開立完整鏈路：
+
+```
+1. 輸入文字 / 語音辨識（Web Speech API）
+2. 「生成 FHIR 草稿」→ POST /api/ai/voice-order → LLM 解析回 MedicationRequest 草稿（含信心度）
+3. 「確認簽署並開立」→ POST /api/fhir/MedicationRequest（status: draft → active）
+4. 成功顯示「已開立至 FHIR · {id}」；priority=stat 時自動推一張警示卡至「主動安全警示」
+```
+
+> **FHIR Proxy 支援寫入**：`/api/fhir/[...path]` 除 `GET` 外已新增 `POST` handler，
+> 讓前端可經 BFF 寫入 FHIR（Bearer token 仍由伺服端附加，前端零暴露）。
+> 寫入僅在有效 session（dev-login / dev-connect 的 `dev-no-auth` 或 SMART OAuth）下成立；
+> Mock 模式（無 session）會回 401，UI 顯示錯誤訊息而非假成功。
 
 ---
 
@@ -280,6 +296,28 @@ ANTHROPIC_API_KEY=sk-ant-...
 | `POST /api/cds-hooks/order-select` | 開立中即時 DDI 警示 |
 | `POST /api/cds-hooks/order-sign` | 簽署前最終確認（≤ 8 張 card） |
 | `GET /api/cds-hooks/test?scenario=warfarin-aspirin` | 內建測試場景 |
+
+---
+
+## 自動化測試（Playwright E2E）
+
+`scripts/e2e-voice-order.mjs` 以無頭 Chromium 跑完整鏈路：
+dev-connect 建立 session → 載入 dashboard → 生成 FHIR 草稿 → 簽署 → 驗證已寫入 HAPI，並截圖。
+
+```bash
+# 1) 起 dev server（BASE 須與 E2E_BASE 一致，否則 dev-connect redirect 會跑錯 port）
+NEXT_PUBLIC_BASE_URL="http://localhost:3007" npx next dev -p 3007
+
+# 2) 另開終端執行
+E2E_BASE="http://localhost:3007" npm run e2e
+```
+
+- 首次或 CI 需先下載瀏覽器：`npx playwright install chromium`
+- 截圖輸出至 `e2e-screenshots/`（`01-fhir-draft.png`、`02-signed.png`；失敗存 `error.png`），已列入 `.gitignore`。
+
+> **本機 redirect 注意**：`dev-connect` 依 `NEXT_PUBLIC_BASE_URL` 產生 redirect。
+> 若 dev server 因 3000 被占用而落在其他 port，務必讓 `NEXT_PUBLIC_BASE_URL` 指向同一 port，
+> 否則會 redirect 到錯誤的服務。
 
 ---
 
@@ -295,7 +333,7 @@ src/
 │   │   │   ├── callback/              # Token 交換 + session
 │   │   │   ├── logout/                # 登出
 │   │   │   └── dev-login/             # 本機 FHIR 直連（非生產）
-│   │   ├── fhir/[...path]/            # FHIR Proxy
+│   │   ├── fhir/[...path]/            # FHIR Proxy（GET 讀 + POST 寫）
 │   │   ├── patient-summary/           # BFF 聚合端點
 │   │   ├── ai/{chat,summarize,voice-order}/
 │   │   └── cds-hooks/{discovery,order-select,order-sign,test}/
@@ -309,7 +347,8 @@ src/
 │   └── cds/{drugInteractions,thresholdAlerts,cardBuilder}.ts
 ├── types/{smart,viewmodels}.ts
 scripts/
-└── seed-fhir.mjs                      # Mock → FHIR R4 Transaction Bundle
+├── seed-fhir.mjs                      # Mock → FHIR R4 Transaction Bundle
+└── e2e-voice-order.mjs                # Playwright E2E：語音開立 → 簽署寫入 FHIR
 docs/
 ├── troubleshooting-smart-auth.md      # SMART OAuth 疑難排解
 └── troubleshooting-zeabur-deploy.md   # Zeabur 部署疑難排解
@@ -429,6 +468,9 @@ A：依序改這四個：`types/viewmodels.ts`（加型別）→ `lib/fhir/mappe
 - [x] BFF + SMART on FHIR OAuth2（PKCE、state、token 自動續期）
 - [x] FHIR TW Core 資料映射（`mappers.ts` → ViewModel）
 - [x] AI 服務（Chat / 智慧摘要 / 語音開立 FHIR MedicationRequest）
+- [x] 語音醫囑簽署寫入 FHIR（FHIR Proxy POST，draft → active）
+- [x] AiVoicePanel 掛入 dashboard（語音 / 對話 / 摘要皆走真實 API）
+- [x] Playwright E2E（語音開立 → 簽署 → 截圖）
 - [x] CDS Hooks（DDI 6 條規則 + 8 個 LOINC 閾值警示）
 - [x] Zeabur 雲端部署 + CI/CD（`https://patient-journey.zeabur.app`）
 - [x] 本機 FHIR Docker 整合（seed + dev-login）
