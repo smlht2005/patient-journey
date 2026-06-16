@@ -10,3 +10,4 @@ coverage/
 e2e-screenshots/
 docs/daily-logs/
 .spec-workflow/
+tsconfig.tsbuildinfo
