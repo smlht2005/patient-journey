@@ -257,7 +257,7 @@ export default function AiVoicePanel({ summary, onNewAlert }: Props) {
 
             <button onClick={generateFhir} disabled={orderLoading || !orderText.trim()}
               style={{ cursor: 'pointer', background: orderLoading || !orderText.trim() ? C.bg3 : `linear-gradient(135deg,${C.cyan},${C.cyanDim})`, color: orderLoading ? C.t3 : C.bg0, border: 'none', borderRadius: 8, padding: '9px 0', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              <Sparkles size={14} />{orderLoading ? 'AI 解析中…' : '生成 FHIR 草稿 (Claude API)'}
+              <Sparkles size={14} />{orderLoading ? 'AI 解析中…' : '生成 FHIR 草稿 (Gemini API)'}
             </button>
 
             {orderWarnings.length > 0 && (
