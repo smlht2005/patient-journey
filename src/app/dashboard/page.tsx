@@ -19,8 +19,17 @@ async function toResources(res: Response): Promise<any[]> {
   return (b.entry ?? []).map((e: any) => e.resource).filter(Boolean);
 }
 
-export default async function Dashboard() {
+export default async function Dashboard({ searchParams }: { searchParams: { patientId?: string } }) {
   const session = await getSession();
+
+  // 切換病人（Fix B）：沿用現有 session token，只覆寫 patientId，
+  // 不再經 dev-login 重建 session（避免把 SMART OAuth token 砍成 dev-no-auth）。
+  const switchTo = searchParams.patientId?.trim();
+  if (switchTo && switchTo !== session.patientId) {
+    session.patientId = switchTo;
+    await session.save();
+  }
+
   let patientId = session.patientId ?? '';
   const tokenValid = isTokenValid(session);
 
@@ -74,7 +83,8 @@ export default async function Dashboard() {
   const iss              = session.iss ?? '';
   const isDev            = session.accessToken === 'dev-no-auth';
   const practitionerName = session.practitionerName;
-  // dev-login 在生產永遠 404，病人切換功能不應顯示
-  const canSwitchPatient = process.env.NODE_ENV !== 'production';
+  // 切換病人（Fix A）：僅限 dev-no-auth session（本機 HAPI / 開放 TW Core sandbox）。
+  // SMART OAuth 模式下 token 綁定特定病人 context，切換到別的病人會被 scope 擋下並 fallback 成 mock，故隱藏。
+  const canSwitchPatient = process.env.NODE_ENV !== 'production' && isDev;
   return <DashboardClient initialSummary={summary} source={source} iss={iss} isDev={isDev} practitionerName={practitionerName} canSwitchPatient={canSwitchPatient} />;
 }
