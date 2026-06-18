@@ -110,14 +110,14 @@ export default function PatientJourneyDashboard({ summary, iss = '', isDev = fal
             onChange={e => setSwitchId(e.target.value)}
             onKeyDown={e => {
               if (e.key === 'Enter' && switchId.trim() && canSwitchPatient && iss) {
-                window.location.href = `/api/auth/dev-login?fhirBase=${encodeURIComponent(iss)}&patientId=${switchId.trim()}`;
+                window.location.href = `/dashboard?patientId=${encodeURIComponent(switchId.trim())}`;
               }
             }}
             style={{ background: 'transparent', border: 'none', outline: 'none', color: C.t1, fontSize: 13, width: '100%' }}
           />
           {canSwitchPatient && switchId.trim() && (
             <button
-              onClick={() => { window.location.href = `/api/auth/dev-login?fhirBase=${encodeURIComponent(iss)}&patientId=${switchId.trim()}`; }}
+              onClick={() => { window.location.href = `/dashboard?patientId=${encodeURIComponent(switchId.trim())}`; }}
               style={{ flexShrink: 0, background: C.cyanDim, border: 'none', borderRadius: 5, padding: '2px 8px', color: C.cyan, fontSize: 11, cursor: 'pointer' }}
             >↵</button>
           )}
