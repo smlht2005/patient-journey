@@ -1,0 +1,48 @@
+# 建置映像並推到 GCP Artifact Registry(標籤為 commit SHA 前 8 碼,不用 latest)。
+# 認證用 Workload Identity Federation,沒有任何長效金鑰。
+# 需要的 Repository variables(Settings → Secrets and variables → Actions → Variables;皆非機密):
+#   GCP_WIF_PROVIDER  例 projects/705753465027/locations/global/workloadIdentityPools/github-pool/providers/github
+#   GCP_SERVICE_ACCOUNT  每個 repo 各自一個,例 gh-patient-jour-1254993715@healthcare-512903.iam.gserviceaccount.com(由 infra/wif-setup.sh 印出)
+# action 一律固定到完整 commit SHA(註解為對應版本);升級時換 SHA,不要改回浮動標籤。
+name: deploy-gcp
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # 向 GCP 換取短期憑證
+
+env:
+  REGION: asia-east1
+  PROJECT: healthcare-512903
+  REPO: apps
+  IMAGE: patient-journey
+
+jobs:
+  build-push:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2.2.1
+      - name: Docker 登入 Artifact Registry
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+      - name: 建置並推送
+        env:
+          BASE_URL: ${{ vars.NEXT_PUBLIC_BASE_URL }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_SHA:0:8}"
+          ref="${REGION}-docker.pkg.dev/${PROJECT}/${REPO}/${IMAGE}:${tag}"
+          docker build --build-arg NEXT_PUBLIC_BASE_URL="${BASE_URL:-http://localhost:8080}" -t "$ref" .
+          docker push "$ref"
+          echo "pushed $ref"
